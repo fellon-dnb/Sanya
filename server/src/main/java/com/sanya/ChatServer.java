@@ -5,7 +5,7 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class вChatServer {
+public class ChatServer {
     private static final int PORT = 12345;
     private static Set<ObjectOutputStream> clients = ConcurrentHashMap.newKeySet();
 
