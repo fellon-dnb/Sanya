@@ -1,19 +1,30 @@
 package com.sanya;
 
-import java.io.*;
-import java.net.*;
+import com.ancevt.replines.core.argument.Arguments;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.PrintStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServer {
-    private static final int PORT = 12345;
+    private static int port;
     private static Set<ObjectOutputStream> clients = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) throws IOException {
+
+        Arguments a = Arguments.parse(args);
+
+        port = a.get(int.class, "--port", 12345);
+
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8)); // вывод в UTF-8
-        ServerSocket serverSocket = new ServerSocket(PORT);
-        System.out.println("Сервер запущен на порту " + PORT);
+        ServerSocket serverSocket = new ServerSocket(port);
+        System.out.println("Сервер запущен на порту " + port);
 
         while (true) {
             Socket socket = serverSocket.accept();
