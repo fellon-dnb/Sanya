@@ -35,7 +35,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.sanya.ChatClient</mainClass>
+                            <mainClass>com.sanya.ChatClientUI</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
