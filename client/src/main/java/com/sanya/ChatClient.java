@@ -2,6 +2,7 @@ package com.sanya;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class ChatClient {
@@ -27,7 +28,7 @@ public class ChatClient {
         }).start();
 
         // Отправка сообщений
-        Scanner scanner = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
         System.out.print("Введите ваше имя: ");
         String name = scanner.nextLine();
 

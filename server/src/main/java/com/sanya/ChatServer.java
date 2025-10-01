@@ -2,14 +2,16 @@ package com.sanya;
 
 import java.io.*;
 import java.net.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServer {
     private static final int PORT = 12345;
     private static Set<ObjectOutputStream> clients = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) throws IOException {
+        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8)); // вывод в UTF-8
         ServerSocket serverSocket = new ServerSocket(PORT);
         System.out.println("Сервер запущен на порту " + PORT);
 
