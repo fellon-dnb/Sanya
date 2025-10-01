@@ -1,16 +1,21 @@
 package com.sanya;
 
+import com.ancevt.replines.core.argument.Arguments;
+
 import java.io.*;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class ChatClient {
-    private static final String HOST = "localhost";
-    private static final int PORT = 12345;
-
     public static void main(String[] args) throws Exception {
-        Socket socket = new Socket(HOST, PORT);
+        Arguments a = Arguments.parse(args);
+
+        String host = a.get(String.class, "--host", "localhost"); // дефолт: localhost
+        int port = a.get(Integer.class, "--port", 12345);         // дефолт: 12345
+
+        System.out.printf("Подключаюсь к %s:%d...%n", host, port);
+
+        Socket socket = new Socket(host, port);
 
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
@@ -27,8 +32,8 @@ public class ChatClient {
             }
         }).start();
 
-        // Отправка сообщений
-        Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
+        // Ввод и отправка
+        Scanner scanner = new Scanner(System.in);
         System.out.print("Введите ваше имя: ");
         String name = scanner.nextLine();
 
