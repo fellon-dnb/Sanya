@@ -29,6 +29,12 @@ public class ChatClientUI extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                connector.close();
+            }
+        });
+
         connector = new ChatClientConnector(host, port, name, new ChatUiCallback() {
             @Override
             public void onMessage(Message message) {
@@ -64,7 +70,7 @@ public class ChatClientUI extends JFrame {
         Arguments a = Arguments.parse(args);
 
         String host = a.get(String.class, "--host", "localhost");
-        int port = a.get(int.class, "--port", 12345);
+        int port = a.get(Integer.class, "--port", 12345);
 
         SwingUtilities.invokeLater(() -> {
             String name = JOptionPane.showInputDialog("Введите имя:");

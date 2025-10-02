@@ -59,11 +59,14 @@ public class ChatServer {
     }
 
     private static void broadcast(Message msg) {
-        for (ObjectOutputStream client : clients) {
+        clients.removeIf(out -> {
             try {
-                client.writeObject(msg);
-                client.flush();
-            } catch (IOException ignored) {}
-        }
+                out.writeObject(msg);
+                out.flush();
+                return false; // всё ок, оставляем
+            } catch (IOException e) {
+                return true;  // соединение умерло → убрать из списка
+            }
+        });
     }
 }
