@@ -14,12 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServer {
     private static int port;
-    private static Set<ObjectOutputStream> clients = ConcurrentHashMap.newKeySet();
+    private static final Set<ObjectOutputStream> clients = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) throws IOException {
-
         Arguments a = Arguments.parse(args);
-
         port = a.get(int.class, "--port", 12345);
 
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8)); // вывод в UTF-8
@@ -28,13 +26,13 @@ public class ChatServer {
 
         while (true) {
             Socket socket = serverSocket.accept();
-            System.out.println("Клиент подключился: " + socket);
             new Thread(new ClientHandler(socket)).start();
         }
     }
 
     static class ClientHandler implements Runnable {
-        private Socket socket;
+        private final Socket socket;
+        private String clientName;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -47,13 +45,23 @@ public class ChatServer {
             ) {
                 clients.add(out);
 
+                // Первое сообщение от клиента — его имя
+                Message joinMsg = (Message) in.readObject();
+                clientName = joinMsg.getFrom();
+
+                System.out.println("Клиент подключился: " + clientName + " (" + socket + ")");
+                broadcast(new Message("SERVER", clientName + " вошёл в чат", Message.Type.SYSTEM));
+
                 while (true) {
                     Message msg = (Message) in.readObject();
-                    System.out.println("Получено: " + msg);
+                    System.out.println("Получено от " + msg.getFrom() + ": " + msg.getText());
                     broadcast(msg);
                 }
             } catch (Exception e) {
-                System.out.println("Клиент отключился");
+                if (clientName != null) {
+                    System.out.println("Клиент отключился: " + clientName);
+                    broadcast(new Message("SERVER", clientName + " покинул чат", Message.Type.SYSTEM));
+                }
             }
         }
     }
@@ -63,9 +71,9 @@ public class ChatServer {
             try {
                 out.writeObject(msg);
                 out.flush();
-                return false; // всё ок, оставляем
+                return false;
             } catch (IOException e) {
-                return true;  // соединение умерло → убрать из списка
+                return true; // убрать «мертвые» соединения
             }
         });
     }

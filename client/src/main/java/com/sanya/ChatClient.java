@@ -10,8 +10,8 @@ public class ChatClient {
     public static void main(String[] args) throws Exception {
         Arguments a = Arguments.parse(args);
 
-        String host = a.get(String.class, "--host", "localhost"); // дефолт: localhost
-        int port = a.get(Integer.class, "--port", 12345);         // дефолт: 12345
+        String host = a.get(String.class, "--host", "localhost");
+        int port = a.get(int.class, "--port", 12345);
 
         System.out.printf("Подключаюсь к %s:%d...%n", host, port);
 
@@ -19,6 +19,14 @@ public class ChatClient {
 
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Введите ваше имя: ");
+        String name = scanner.nextLine();
+
+        // ⚡ Сразу отправляем имя на сервер
+        out.writeObject(new Message(name, "<<<HELLO>>>"));
+        out.flush();
 
         // Поток для приёма сообщений
         new Thread(() -> {
@@ -33,10 +41,6 @@ public class ChatClient {
         }).start();
 
         // Ввод и отправка
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Введите ваше имя: ");
-        String name = scanner.nextLine();
-
         while (true) {
             String text = scanner.nextLine();
             out.writeObject(new Message(name, text));
