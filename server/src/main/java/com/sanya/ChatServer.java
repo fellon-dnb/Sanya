@@ -50,7 +50,7 @@ public class ChatServer {
                 clientName = joinMsg.getFrom();
 
                 System.out.println("Client connected: " + clientName + " (" + socket + ")");
-                broadcast(new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
+                broadcast(new Message("SERVER", clientName + " entered the cаhat", Message.Type.SYSTEM));
 
                 while (true) {
                     Message msg = (Message) in.readObject();
