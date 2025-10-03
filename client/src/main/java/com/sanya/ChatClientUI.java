@@ -69,7 +69,7 @@ public class ChatClientUI extends JFrame {
     public static void main(String[] args) {
         Arguments a = Arguments.parse(args);
 
-        String host = a.get(String.class, "--host", "localhost");
+         String host = a.get(String.class, "--host", "localhost");
         int port = a.get(Integer.class, "--port", 12345);
 
         SwingUtilities.invokeLater(() -> {
