@@ -73,7 +73,7 @@ public class ChatClientUI extends JFrame {
         int port = a.get(Integer.class, "--port", 12345);
 
         SwingUtilities.invokeLater(() -> {
-            String name = JOptionPane.showInputDialog("Введите имя:");
+            String name = JOptionPane.showInputDialog("Enter your Name:");
             ChatClientUI ui = new ChatClientUI(host, port, name);
             ui.setVisible(true);
         });

@@ -13,7 +13,7 @@ public class ChatClient {
         String host = a.get(String.class, "--host", "localhost");
         int port = a.get(int.class, "--port", 12345);
 
-        System.out.printf("Подключаюсь к %s:%d...%n", host, port);
+        System.out.printf("Connecting to %s:%d...%n", host, port);
 
         Socket socket = new Socket(host, port);
 
@@ -21,7 +21,7 @@ public class ChatClient {
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
         Scanner scanner = new Scanner(System.in);
-        System.out.print("Введите ваше имя: ");
+        System.out.print("Enter your Name: ");
         String name = scanner.nextLine();
 
         // ⚡ Сразу отправляем имя на сервер
@@ -36,7 +36,7 @@ public class ChatClient {
                     System.out.println(msg);
                 }
             } catch (Exception e) {
-                System.out.println("Соединение закрыто");
+                System.out.println("Connection closed");
             }
         }).start();
 

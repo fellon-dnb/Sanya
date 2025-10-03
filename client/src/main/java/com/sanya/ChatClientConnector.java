@@ -31,7 +31,7 @@ public class ChatClientConnector {
                 in = new ObjectInputStream(socket.getInputStream());
 
                 // Сразу после подключения отправляем имя
-                out.writeObject(new Message(name, name + " вошёл в чат", Message.Type.SYSTEM));
+                out.writeObject(new Message(name, name + " enter the chat", Message.Type.SYSTEM));
                 out.flush();
 
 

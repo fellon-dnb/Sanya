@@ -22,7 +22,7 @@ public class ChatServer {
 
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8)); // вывод в UTF-8
         ServerSocket serverSocket = new ServerSocket(port);
-        System.out.println("Сервер запущен на порту " + port);
+        System.out.println("Server started on port " + port);
 
         while (true) {
             Socket socket = serverSocket.accept();
@@ -49,18 +49,18 @@ public class ChatServer {
                 Message joinMsg = (Message) in.readObject();
                 clientName = joinMsg.getFrom();
 
-                System.out.println("Клиент подключился: " + clientName + " (" + socket + ")");
-                broadcast(new Message("SERVER", clientName + " вошёл в чат", Message.Type.SYSTEM));
+                System.out.println("Client connected: " + clientName + " (" + socket + ")");
+                broadcast(new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
 
                 while (true) {
                     Message msg = (Message) in.readObject();
-                    System.out.println("Получено от " + msg.getFrom() + ": " + msg.getText());
+                    System.out.println("Received from " + msg.getFrom() + ": " + msg.getText());
                     broadcast(msg);
                 }
             } catch (Exception e) {
                 if (clientName != null) {
-                    System.out.println("Клиент отключился: " + clientName);
-                    broadcast(new Message("SERVER", clientName + " покинул чат", Message.Type.SYSTEM));
+                    System.out.println("Client disconnected: " + clientName);
+                    broadcast(new Message("SERVER", clientName + " left the chat", Message.Type.SYSTEM));
                 }
             }
         }
