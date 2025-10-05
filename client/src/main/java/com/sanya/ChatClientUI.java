@@ -1,7 +1,13 @@
 package com.sanya;
 
-import com.sanya.events.*;
 import com.ancevt.replines.core.argument.Arguments;
+import com.ancevt.replines.core.repl.integration.ReplSwingConnector;
+import com.sanya.commands.CommandHandler;
+import com.sanya.events.EventBus;
+import com.sanya.events.MessageReceivedEvent;
+import com.sanya.events.MessageSendEvent;
+import com.sanya.events.SimpleEventBus;
+
 import javax.swing.*;
 import java.awt.*;
 
@@ -47,6 +53,13 @@ public class ChatClientUI extends JFrame {
                 connector.close();
             }
         });
+
+        CommandHandler commandHandler = new CommandHandler();
+        ReplSwingConnector.launch(inputField,
+                chatArea,
+                commandHandler.getReplRunner(),
+                true);
+
     }
 
     private void sendCurrent() {
