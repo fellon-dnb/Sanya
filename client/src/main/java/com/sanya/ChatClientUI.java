@@ -1,8 +1,11 @@
 package com.sanya;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.ancevt.replines.core.repl.UnknownCommandException;
+import com.ancevt.replines.core.repl.integration.LineCallbackOutputStream;
+import com.ancevt.replines.core.repl.integration.PushableInputStream;
+import com.ancevt.replines.core.repl.integration.ReplSwingConnector;
 import com.sanya.commands.CommandHandler;
-import com.sanya.commands.CommandRegistryLocal;
 import com.sanya.events.*;
 
 import javax.swing.*;
@@ -46,11 +49,9 @@ public class ChatClientUI extends JFrame {
         connector.connect();
 
         // Командный обработчик (поддержка /help, /exit, /clear)
-        commandHandler = new CommandHandler(chatArea, eventBus);
+        commandHandler = new CommandHandler(eventBus);
 
-        // Обработка кнопки и Enter
-        sendButton.addActionListener(e -> handleInput());
-        inputField.addActionListener(e -> handleInput());
+
 
         // При закрытии окна
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -59,6 +60,23 @@ public class ChatClientUI extends JFrame {
                 connector.close();
             }
         });
+
+        LineCallbackOutputStream outputStream = new LineCallbackOutputStream(line -> {
+            if (line != null && !line.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    chatArea.append(line + "\n");
+                    chatArea.setCaretPosition(chatArea.getDocument().getLength());
+                });
+            }
+        });
+
+        commandHandler.getReplRunner().setOutputStream(outputStream);
+
+//        ReplSwingConnector.launch(inputField, chatArea, commandHandler.getReplRunner(), true);
+
+        // Обработка кнопки и Enter
+        sendButton.addActionListener(e -> handleInput());
+        inputField.addActionListener(e -> handleInput());
     }
 
     /**
@@ -68,14 +86,14 @@ public class ChatClientUI extends JFrame {
         String text = inputField.getText().trim();
         if (text.isEmpty()) return;
 
-        try {
-            if (CommandRegistryLocal.isCommand(text)) {
+        if (text.startsWith("/")) {
+            try {
                 commandHandler.getReplRunner().execute(text);
-            } else {
-                eventBus.publish(new MessageSendEvent(text));
+            } catch (UnknownCommandException e) {
+                throw new RuntimeException(e);
             }
-        } catch (com.ancevt.replines.core.repl.UnknownCommandException e) {
-            appendMessage("[SYSTEM] Неизвестная команда: " + text);
+        } else {
+            eventBus.publish(new MessageSendEvent(text));
         }
 
         inputField.setText("");

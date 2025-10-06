@@ -5,28 +5,11 @@ import com.ancevt.replines.core.repl.ReplRunner;
 import com.sanya.events.ClearChatEvent;
 import com.sanya.events.EventBus;
 
-import javax.swing.*;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-
 public class CommandHandler {
 
     private final ReplRunner replRunner;
 
-    public CommandHandler(JTextArea outputArea, EventBus eventBus) {
-
-        OutputStream outputStream = new OutputStream() {
-            @Override
-            public void write(int b) {
-                SwingUtilities.invokeLater(() -> {
-                    // Декодируем символ правильно (в UTF-8)
-                    outputArea.append(new String(new byte[]{(byte) b}, StandardCharsets.UTF_8));
-                    outputArea.setCaretPosition(outputArea.getDocument().getLength());
-                });
-            }
-        };
+    public CommandHandler(EventBus eventBus) {
 
         CommandRegistry registry = new CommandRegistry();
 
@@ -40,7 +23,7 @@ public class CommandHandler {
         registry.command("/help")
                 .action((r, args) -> {
                     r.println("[SYSTEM] Доступные команды:");
-                    CommandRegistryLocal.getCommands().forEach(cmd -> r.println("  " + cmd));
+                    r.println(registry.formattedCommandList());
                 })
                 .build();
 
@@ -51,11 +34,9 @@ public class CommandHandler {
                 })
                 .build();
 
-        // 💡 Создаём PrintStream с жёстким UTF-8
-        PrintStream utf8PrintStream = new PrintStream(outputStream, true, StandardCharsets.UTF_8);
 
-        this.replRunner = ReplRunner.builder()
-                .withOutput(utf8PrintStream)
+
+        replRunner = ReplRunner.builder()
                 .withRegistry(registry)
                 .build();
     }
