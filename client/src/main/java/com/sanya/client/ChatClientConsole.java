@@ -1,7 +1,7 @@
-package com.sanya;
+package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
-import com.sanya.commands.CommandHandler;
+import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.*;
 
 import java.io.PrintStream;
