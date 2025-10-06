@@ -1,6 +1,12 @@
 package com.sanya;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.ancevt.replines.core.repl.integration.ReplSwingConnector;
+import com.sanya.commands.CommandHandler;
+import com.sanya.events.EventBus;
+import com.sanya.events.MessageReceivedEvent;
+import com.sanya.events.MessageSendEvent;
+import com.sanya.events.SimpleEventBus;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,6 +17,7 @@ public class ChatClientUI extends JFrame {
     private final JTextField inputField = new JTextField();
     private final JButton sendButton = new JButton("Send");
 
+    private final EventBus eventBus = new SimpleEventBus();
     private final ChatClientConnector connector;
 
     public ChatClientUI(String host, int port, String name) {
@@ -29,34 +36,36 @@ public class ChatClientUI extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
+        // Подписка: получаем входящие сообщения и печатаем
+        eventBus.subscribe(MessageReceivedEvent.class, e -> {
+            appendMessage(e.message().toString());
+        });
+
+        connector = new ChatClientConnector(host, port, name, eventBus);
+        connector.connect();
+
+        // При нажатии публикуем событие MessageSendEvent
+        sendButton.addActionListener(e -> sendCurrent());
+        inputField.addActionListener(e -> sendCurrent());
+
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosing(java.awt.event.WindowEvent e) {
                 connector.close();
             }
         });
 
-        connector = new ChatClientConnector(host, port, name, new ChatUiCallback() {
-            @Override
-            public void onMessage(Message message) {
-                appendMessage(message.toString());
-            }
+        CommandHandler commandHandler = new CommandHandler();
+        ReplSwingConnector.launch(inputField,
+                chatArea,
+                commandHandler.getReplRunner(),
+                true);
 
-            @Override
-            public void onError(Throwable t) {
-                appendMessage("ERROR: " + t.getMessage());
-            }
-        });
-
-        connector.connect();
-
-        sendButton.addActionListener(e -> sendCurrent());
-        inputField.addActionListener(e -> sendCurrent());
     }
 
     private void sendCurrent() {
         String text = inputField.getText().trim();
         if (!text.isEmpty()) {
-            connector.sendMessage(text);
+            eventBus.publish(new MessageSendEvent(text));
             inputField.setText("");
         }
     }
@@ -68,7 +77,6 @@ public class ChatClientUI extends JFrame {
 
     public static void main(String[] args) {
         Arguments a = Arguments.parse(args);
-
         String host = a.get(String.class, "--host", "localhost");
         int port = a.get(Integer.class, "--port", 12345);
 
