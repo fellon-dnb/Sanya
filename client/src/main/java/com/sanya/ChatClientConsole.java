@@ -2,7 +2,6 @@ package com.sanya;
 
 import com.ancevt.replines.core.argument.Arguments;
 import com.sanya.commands.CommandHandler;
-import com.sanya.commands.CommandRegistryLocal;
 import com.sanya.events.*;
 
 import java.io.PrintStream;
@@ -29,7 +28,7 @@ public class ChatClientConsole {
         eventBus.subscribe(ClearChatEvent.class, e -> clearConsole());
 
         // создаём обработчик команд (вывод идёт в консоль)
-        commandHandler = new CommandHandler(new JTextAreaProxy(), eventBus);
+        commandHandler = new CommandHandler(eventBus);
 
         System.out.println("[SYSTEM] Подключение успешно. Введите сообщение или /help.");
     }
@@ -51,7 +50,7 @@ public class ChatClientConsole {
             String text = scanner.nextLine().trim();
             if (text.isEmpty()) continue;
 
-            if (CommandRegistryLocal.isCommand(text)) {
+            if (text.startsWith("/")) {
                 try {
                     commandHandler.getReplRunner().execute(text);
                 } catch (com.ancevt.replines.core.repl.UnknownCommandException e) {
