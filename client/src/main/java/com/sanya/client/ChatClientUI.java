@@ -1,12 +1,12 @@
-package com.sanya;
+package com.sanya.client;
 
-import com.ancevt.replines.core.argument.Arguments;
 import com.ancevt.replines.core.repl.UnknownCommandException;
 import com.ancevt.replines.core.repl.integration.LineCallbackOutputStream;
-import com.ancevt.replines.core.repl.integration.PushableInputStream;
-import com.ancevt.replines.core.repl.integration.ReplSwingConnector;
-import com.sanya.commands.CommandHandler;
-import com.sanya.events.*;
+import com.sanya.client.commands.CommandHandler;
+import com.sanya.events.ClearChatEvent;
+import com.sanya.events.EventBus;
+import com.sanya.events.MessageReceivedEvent;
+import com.sanya.events.MessageSendEvent;
 
 import javax.swing.*;
 import java.awt.*;
@@ -20,12 +20,20 @@ public class ChatClientUI extends JFrame {
     private final JTextField inputField = new JTextField();
     private final JButton sendButton = new JButton("Send");
 
-    private final EventBus eventBus = new SimpleEventBus();
     private final ChatClientConnector connector;
     private final CommandHandler commandHandler;
+    private final ApplicationContext ctx;
+    private final LineCallbackOutputStream outputStream;
 
-    public ChatClientUI(String host, int port, String name) {
-        setTitle("Chat Client - " + name);
+    public ChatClientUI(ApplicationContext ctx) {
+        this.ctx = ctx;
+        String username = ctx.getUsername();
+        String host = ctx.getHost();
+        int port = ctx.getPort();
+
+        EventBus eventBus = ctx.getEventBus();
+
+        setTitle("Chat Client - " + username);
         setSize(400, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -45,7 +53,7 @@ public class ChatClientUI extends JFrame {
         eventBus.subscribe(ClearChatEvent.class, e -> clearChat());
 
         // Подключаемся к серверу
-        connector = new ChatClientConnector(host, port, name, eventBus);
+        connector = new ChatClientConnector(host, port, username, eventBus);
         connector.connect();
 
         // Командный обработчик (поддержка /help, /exit, /clear)
@@ -61,7 +69,7 @@ public class ChatClientUI extends JFrame {
             }
         });
 
-        LineCallbackOutputStream outputStream = new LineCallbackOutputStream(line -> {
+        outputStream = new LineCallbackOutputStream(line -> {
             if (line != null && !line.isEmpty()) {
                 SwingUtilities.invokeLater(() -> {
                     chatArea.append(line + "\n");
@@ -90,10 +98,11 @@ public class ChatClientUI extends JFrame {
             try {
                 commandHandler.getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
-                throw new RuntimeException(e);
+                chatArea.append("Unknown command: " + text.split(" ")[0]);
+                e.printStackTrace();
             }
         } else {
-            eventBus.publish(new MessageSendEvent(text));
+            ctx.getEventBus().publish(new MessageSendEvent(text));
         }
 
         inputField.setText("");
@@ -108,16 +117,4 @@ public class ChatClientUI extends JFrame {
         chatArea.setText("");
     }
 
-    public static void main(String[] args) {
-        Arguments a = Arguments.parse(args);
-        String host = a.get(String.class, "--host", "localhost");
-        int port = a.get(Integer.class, "--port", 12345);
-
-        SwingUtilities.invokeLater(() -> {
-            String name = JOptionPane.showInputDialog("Enter your Name:");
-            if (name == null || name.isBlank()) name = "Anonymous";
-            ChatClientUI ui = new ChatClientUI(host, port, name);
-            ui.setVisible(true);
-        });
-    }
 }

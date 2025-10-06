@@ -1,5 +1,6 @@
-package com.sanya;
+package com.sanya.client;
 
+import com.sanya.Message;
 import com.sanya.events.*;
 
 import javax.swing.*;

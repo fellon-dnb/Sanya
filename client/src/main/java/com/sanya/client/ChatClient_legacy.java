@@ -1,6 +1,7 @@
-package com.sanya;
+package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.Message;
 
 import java.io.*;
 import java.net.*;

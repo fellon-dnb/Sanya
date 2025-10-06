@@ -22,7 +22,7 @@
             <configuration>
               <transformers>
                 <transformer>
-                  <mainClass>com.sanya.ChatClient_legacy</mainClass>
+                  <mainClass>com.sanya.client.ChatClient_legacy</mainClass>
                 </transformer>
               </transformers>
             </configuration>

@@ -1,4 +1,4 @@
-package com.sanya.commands;
+package com.sanya.client.commands;
 
 import com.ancevt.replines.core.repl.CommandRegistry;
 import com.ancevt.replines.core.repl.ReplRunner;
