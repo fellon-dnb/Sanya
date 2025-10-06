@@ -1,13 +1,14 @@
 package com.sanya.commands;
 
-import com.ancevt.replines.core.repl.ReplRunner;
 import com.ancevt.replines.core.repl.CommandRegistry;
+import com.ancevt.replines.core.repl.ReplRunner;
 import com.sanya.events.ClearChatEvent;
 import com.sanya.events.EventBus;
 
 import javax.swing.*;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 public class CommandHandler {
@@ -20,7 +21,8 @@ public class CommandHandler {
             @Override
             public void write(int b) {
                 SwingUtilities.invokeLater(() -> {
-                    outputArea.append(String.valueOf((char) b));
+                    // Декодируем символ правильно (в UTF-8)
+                    outputArea.append(new String(new byte[]{(byte) b}, StandardCharsets.UTF_8));
                     outputArea.setCaretPosition(outputArea.getDocument().getLength());
                 });
             }
@@ -42,7 +44,6 @@ public class CommandHandler {
                 })
                 .build();
 
-        // ✅ Новая команда /clear
         registry.command("/clear")
                 .action((r, args) -> {
                     r.println("[SYSTEM] Очищаю чат...");
@@ -50,8 +51,11 @@ public class CommandHandler {
                 })
                 .build();
 
+        // 💡 Создаём PrintStream с жёстким UTF-8
+        PrintStream utf8PrintStream = new PrintStream(outputStream, true, StandardCharsets.UTF_8);
+
         this.replRunner = ReplRunner.builder()
-                .withOutput(new PrintStream(outputStream, true, StandardCharsets.UTF_8))
+                .withOutput(utf8PrintStream)
                 .withRegistry(registry)
                 .build();
     }

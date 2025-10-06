@@ -7,7 +7,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
-public class ChatClient {
+public class ChatClient_legacy {
     public static void main(String[] args) throws Exception {
         Arguments a = Arguments.parse(args);
 
