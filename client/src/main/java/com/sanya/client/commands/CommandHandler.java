@@ -5,6 +5,9 @@ import com.ancevt.replines.core.repl.ReplRunner;
 import com.sanya.events.ClearChatEvent;
 import com.sanya.events.EventBus;
 
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+
 public class CommandHandler {
 
     private final ReplRunner replRunner;
@@ -38,6 +41,7 @@ public class CommandHandler {
 
         replRunner = ReplRunner.builder()
                 .withRegistry(registry)
+                .withOutput(new PrintStream(System.out, true, StandardCharsets.UTF_8))
                 .build();
     }
 
