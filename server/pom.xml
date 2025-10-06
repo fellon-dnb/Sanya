@@ -13,7 +13,11 @@
     <artifactId>server</artifactId>
     <packaging>jar</packaging>
     <name>el_server</name>
-
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <file.encoding>UTF-8</file.encoding>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>com.sanya</groupId>

@@ -4,6 +4,7 @@ import com.ancevt.replines.core.argument.Arguments;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class ChatClient {
@@ -20,7 +21,7 @@ public class ChatClient {
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
-        Scanner scanner = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
         System.out.print("Enter your Name: ");
         String name = scanner.nextLine();
 

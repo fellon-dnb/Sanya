@@ -1,16 +1,16 @@
 package com.sanya;
 
 import com.ancevt.replines.core.argument.Arguments;
-import com.ancevt.replines.core.repl.integration.ReplSwingConnector;
 import com.sanya.commands.CommandHandler;
-import com.sanya.events.EventBus;
-import com.sanya.events.MessageReceivedEvent;
-import com.sanya.events.MessageSendEvent;
-import com.sanya.events.SimpleEventBus;
+import com.sanya.commands.CommandRegistryLocal;
+import com.sanya.events.*;
 
 import javax.swing.*;
 import java.awt.*;
 
+/**
+ * Клиентский UI для чата — Swing-окно с EventBus и поддержкой команд.
+ */
 public class ChatClientUI extends JFrame {
 
     private final JTextArea chatArea = new JTextArea();
@@ -19,6 +19,7 @@ public class ChatClientUI extends JFrame {
 
     private final EventBus eventBus = new SimpleEventBus();
     private final ChatClientConnector connector;
+    private final CommandHandler commandHandler;
 
     public ChatClientUI(String host, int port, String name) {
         setTitle("Chat Client - " + name);
@@ -36,43 +37,57 @@ public class ChatClientUI extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
-        // Подписка: получаем входящие сообщения и печатаем
-        eventBus.subscribe(MessageReceivedEvent.class, e -> {
-            appendMessage(e.message().toString());
-        });
+        // Подписки EventBus
+        eventBus.subscribe(MessageReceivedEvent.class, e -> appendMessage(e.message().toString()));
+        eventBus.subscribe(ClearChatEvent.class, e -> clearChat());
 
+        // Подключаемся к серверу
         connector = new ChatClientConnector(host, port, name, eventBus);
         connector.connect();
 
-        // При нажатии публикуем событие MessageSendEvent
-        sendButton.addActionListener(e -> sendCurrent());
-        inputField.addActionListener(e -> sendCurrent());
+        // Командный обработчик (поддержка /help, /exit, /clear)
+        commandHandler = new CommandHandler(chatArea, eventBus);
 
+        // Обработка кнопки и Enter
+        sendButton.addActionListener(e -> handleInput());
+        inputField.addActionListener(e -> handleInput());
+
+        // При закрытии окна
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
                 connector.close();
             }
         });
-
-        CommandHandler commandHandler = new CommandHandler();
-        ReplSwingConnector.launch(inputField,
-                chatArea,
-                commandHandler.getReplRunner(),
-                true);
-
     }
 
-    private void sendCurrent() {
+    /**
+     * Обрабатывает ввод пользователя — сообщение или команду.
+     */
+    private void handleInput() {
         String text = inputField.getText().trim();
-        if (!text.isEmpty()) {
-            eventBus.publish(new MessageSendEvent(text));
-            inputField.setText("");
+        if (text.isEmpty()) return;
+
+        try {
+            if (CommandRegistryLocal.isCommand(text)) {
+                commandHandler.getReplRunner().execute(text);
+            } else {
+                eventBus.publish(new MessageSendEvent(text));
+            }
+        } catch (com.ancevt.replines.core.repl.UnknownCommandException e) {
+            appendMessage("[SYSTEM] Неизвестная команда: " + text);
         }
+
+        inputField.setText("");
     }
 
     private void appendMessage(String msg) {
         chatArea.append(msg + "\n");
         chatArea.setCaretPosition(chatArea.getDocument().getLength());
+    }
+
+    private void clearChat() {
+        chatArea.setText("");
     }
 
     public static void main(String[] args) {
@@ -82,6 +97,7 @@ public class ChatClientUI extends JFrame {
 
         SwingUtilities.invokeLater(() -> {
             String name = JOptionPane.showInputDialog("Enter your Name:");
+            if (name == null || name.isBlank()) name = "Anonymous";
             ChatClientUI ui = new ChatClientUI(host, port, name);
             ui.setVisible(true);
         });
