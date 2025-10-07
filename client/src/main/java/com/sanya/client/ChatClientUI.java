@@ -3,10 +3,7 @@ package com.sanya.client;
 import com.ancevt.replines.core.repl.UnknownCommandException;
 import com.ancevt.replines.core.repl.integration.LineCallbackOutputStream;
 import com.sanya.client.commands.CommandHandler;
-import com.sanya.events.ClearChatEvent;
-import com.sanya.events.EventBus;
-import com.sanya.events.MessageReceivedEvent;
-import com.sanya.events.MessageSendEvent;
+import com.sanya.events.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,23 +21,25 @@ public class ChatClientUI extends JFrame {
     private final CommandHandler commandHandler;
     private final ApplicationContext ctx;
     private final LineCallbackOutputStream outputStream;
+    private final DefaultListModel<String> userListModel = new DefaultListModel<>();
+    private final JList<String> userList = new JList<>(userListModel);
 
     public ChatClientUI(ApplicationContext ctx) {
         this.ctx = ctx;
         String username = ctx.getUsername();
         String host = ctx.getHost();
         int port = ctx.getPort();
-
         EventBus eventBus = ctx.getEventBus();
 
         setTitle("Chat Client - " + username);
-        setSize(400, 500);
+        setSize(600, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         chatArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(chatArea);
 
+        // Панель чата и ввода
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(inputField, BorderLayout.CENTER);
         bottom.add(sendButton, BorderLayout.EAST);
@@ -48,20 +47,48 @@ public class ChatClientUI extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
-        // Подписки EventBus
+        // Список пользователей
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.add(new JLabel("Активные пользователи:"), BorderLayout.NORTH);
+        rightPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
+        add(rightPanel, BorderLayout.EAST);
+
+        // -------------------------------
+        //  Подписки EventBus
+        // -------------------------------
         eventBus.subscribe(MessageReceivedEvent.class, e -> appendMessage(e.message().toString()));
         eventBus.subscribe(ClearChatEvent.class, e -> clearChat());
+
+        //  Подписка на обновление списка пользователей
+        eventBus.subscribe(UserListUpdatedEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> {
+                userListModel.clear();
+                e.usernames().forEach(userListModel::addElement);
+            });
+        });
+
+        //  Подписка на вход нового пользователя
+        eventBus.subscribe(UserConnectedEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> {
+                if (!userListModel.contains(e.username())) {
+                    userListModel.addElement(e.username());
+                }
+            });
+        });
+
+        //  Подписка на выход пользователя
+        eventBus.subscribe(UserDisconnectedEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> userListModel.removeElement(e.username()));
+        });
 
         // Подключаемся к серверу
         connector = new ChatClientConnector(host, port, username, eventBus);
         connector.connect();
 
-        // Командный обработчик (поддержка /help, /exit, /clear)
+        // Командный обработчик (/help, /exit, /clear)
         commandHandler = new CommandHandler(eventBus);
 
-
-
-        // При закрытии окна
+        // При закрытии окна — отключаемся
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -69,6 +96,7 @@ public class ChatClientUI extends JFrame {
             }
         });
 
+        // Потоковый вывод команд в UI
         outputStream = new LineCallbackOutputStream(line -> {
             if (line != null && !line.isEmpty()) {
                 SwingUtilities.invokeLater(() -> {
@@ -79,8 +107,6 @@ public class ChatClientUI extends JFrame {
         });
 
         commandHandler.getReplRunner().setOutputStream(outputStream);
-
-//        ReplSwingConnector.launch(inputField, chatArea, commandHandler.getReplRunner(), true);
 
         // Обработка кнопки и Enter
         sendButton.addActionListener(e -> handleInput());
@@ -98,8 +124,7 @@ public class ChatClientUI extends JFrame {
             try {
                 commandHandler.getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
-                chatArea.append("Unknown command: " + text.split(" ")[0]);
-                e.printStackTrace();
+                chatArea.append("Unknown command: " + text.split(" ")[0] + "\n");
             }
         } else {
             ctx.getEventBus().publish(new MessageSendEvent(text));
@@ -116,5 +141,4 @@ public class ChatClientUI extends JFrame {
     private void clearChat() {
         chatArea.setText("");
     }
-
 }

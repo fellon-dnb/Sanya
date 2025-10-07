@@ -9,6 +9,7 @@ target/
 *.iws
 *.iml
 *.ipr
+*.docx
 out/
 target/
 
@@ -35,4 +36,4 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store
+.DS_Store*.docx
