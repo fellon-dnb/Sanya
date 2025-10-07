@@ -40,7 +40,7 @@ public class ChatClientConnector {
                 eventBus.publish(new UserConnectedEvent(username));
 
                 // Уведомляем сервер
-                out.writeObject(new Message(username, username + " entered the chat", Message.Type.SYSTEM));
+                out.writeObject(new Message(username, "я в чате"));
                 out.flush();
 
                 // Основной цикл чтения сообщений
