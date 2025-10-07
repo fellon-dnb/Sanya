@@ -68,6 +68,6 @@ public class NotificationManager {
     }
 
     public static void showError(String message) {
-        showToast("[ERROR] " + message, new Color(100, 0, 0), Color.WHITE);
+        showToast("[ERROR] " + message, new Color(219, 15, 15), Color.WHITE);
     }
 }
