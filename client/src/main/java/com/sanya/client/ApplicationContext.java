@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.sanya.events.EventBus;
+import com.sanya.events.Theme;
 
 public class ApplicationContext {
 
@@ -9,6 +10,9 @@ public class ApplicationContext {
     private ApplicationContext context;
     private String username;
     private EventBus eventBus;
+    private Theme currentTheme = Theme.DARK;
+
+
 
     public void setEventBus(EventBus eventBus) {
         this.eventBus = eventBus;
@@ -48,5 +52,13 @@ public class ApplicationContext {
 
     public void setContext(ApplicationContext context) {
         this.context = context;
+    }
+
+    public Theme getCurrentTheme() {
+        return currentTheme;
+    }
+
+    public void setCurrentTheme(Theme theme) {
+        this.currentTheme = theme;
     }
 }

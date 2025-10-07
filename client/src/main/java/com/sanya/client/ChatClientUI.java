@@ -17,6 +17,7 @@ public class ChatClientUI extends JFrame {
     private final JTextPane chatPane = new JTextPane();
     private final JTextField inputField = new JTextField();
     private final JButton sendButton = new JButton("Send");
+    private final JToggleButton themeToggle = new JToggleButton("Light");
 
     private final ChatClientConnector connector;
     private final CommandHandler commandHandler;
@@ -36,6 +37,10 @@ public class ChatClientUI extends JFrame {
         setSize(700, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        //Тема
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        topPanel.add(themeToggle);
+        add(topPanel, BorderLayout.NORTH);
 
         chatPane.setEditable(false);
         doc = chatPane.getStyledDocument();
@@ -82,7 +87,14 @@ public class ChatClientUI extends JFrame {
                 e.usernames().forEach(userListModel::addElement);
             });
         });
+        eventBus.subscribe(ThemeChangedEvent.class, e ->
+                SwingUtilities.invokeLater(() -> applyTheme(e.theme())));
 
+        themeToggle.addActionListener(e -> {
+    Theme newTheme = themeToggle.isSelected() ? Theme.LIGHT : Theme.DARK;
+    ctx.getEventBus().publish(new ThemeChangedEvent(newTheme));
+    themeToggle.setText(newTheme == Theme.LIGHT ? "Dark" : "Light");
+});
         // Подключаемся к серверу
         connector = new ChatClientConnector(host, port, username, eventBus);
         connector.connect();
@@ -108,9 +120,17 @@ public class ChatClientUI extends JFrame {
 
         // Обработка кнопки и Enter
         sendButton.addActionListener(e -> handleInput());
+        applyTheme(ctx.getCurrentTheme());
+
         inputField.addActionListener(e -> handleInput());
     }
-
+    private void refreshStyles() {
+        SwingUtilities.invokeLater(() -> {
+            String fullText = chatPane.getText();
+            chatPane.setText("");
+            appendMessage(fullText, "default");
+        });
+    }
     /** Создаёт стили для форматирования сообщений. */
     private void createStyles(JTextPane pane) {
         Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
@@ -160,4 +180,40 @@ public class ChatClientUI extends JFrame {
     private void clearChat() {
         SwingUtilities.invokeLater(() -> chatPane.setText(""));
     }
+    private void applyTheme(Theme theme) {
+        Color bg, fg, system, error;
+
+        if (theme == Theme.LIGHT) {
+            bg = new Color(245, 245, 245);
+            fg = Color.BLACK;
+            system = new Color(80, 80, 80);
+            error = new Color(200, 30, 30);
+        } else {
+            bg = new Color(25, 25, 25);
+            fg = new Color(230, 230, 230);
+            system = new Color(180, 180, 180);
+            error = new Color(255, 100, 100);
+        }
+
+        chatPane.setBackground(bg);
+        userList.setBackground(bg.darker());
+        userList.setForeground(fg);
+        inputField.setBackground(bg.darker());
+        inputField.setForeground(fg);
+        sendButton.setBackground(bg);
+        sendButton.setForeground(fg);
+
+        Style regular = chatPane.getStyle("default");
+        StyleConstants.setForeground(regular, fg);
+
+        Style systemStyle = chatPane.getStyle("system");
+        StyleConstants.setForeground(systemStyle, system);
+
+        Style errorStyle = chatPane.getStyle("error");
+        StyleConstants.setForeground(errorStyle, error);
+
+        chatPane.repaint();
+        refreshStyles();
+    }
+
 }
