@@ -11,7 +11,7 @@ public class ApplicationContext {
     private String username;
     private EventBus eventBus;
     private Theme currentTheme = Theme.DARK;
-
+    private boolean soundEnabled = true;
 
 
     public void setEventBus(EventBus eventBus) {
@@ -60,5 +60,13 @@ public class ApplicationContext {
 
     public void setCurrentTheme(Theme theme) {
         this.currentTheme = theme;
+    }
+
+    public boolean isSoundEnabled() {
+        return soundEnabled;
+    }
+
+    public void setSoundEnabled(boolean soundEnabled) {
+        this.soundEnabled = soundEnabled;
     }
 }
