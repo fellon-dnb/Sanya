@@ -1,21 +1,27 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.repl.UnknownCommandException;
+import com.ancevt.replines.core.repl.integration.LineCallbackOutputStream;
+import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.ui.FileTransferProgressDialog;
 import com.sanya.client.ui.NotificationManager;
 import com.sanya.events.*;
+import com.sanya.files.FileTransferEvent;
 
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
+import java.io.File;
 
 /**
- * Клиентский UI для чата — Swing-окно с EventBus, темами, звуком и уведомлениями.
+ * Клиентский UI для чата — Swing-окно с EventBus, темами, звуком, уведомлениями и передачей файлов.
  */
 public class ChatClientUI extends JFrame {
 
     private final JTextPane chatPane = new JTextPane();
     private final JTextField inputField = new JTextField();
     private final JButton sendButton = new JButton("Send");
+    private final JButton fileButton = new JButton("📁 File");
     private final JToggleButton themeToggle = new JToggleButton();
     private final JToggleButton soundToggle = new JToggleButton();
 
@@ -40,7 +46,7 @@ public class ChatClientUI extends JFrame {
         // 🔹 Верхняя панель (тема и звук)
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
         Font emojiFont;
-                if (System.getProperty("os.name").toLowerCase().contains("win")) {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
             emojiFont = new Font("Segoe UI Emoji", Font.PLAIN, 16);
         } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
             emojiFont = new Font("Apple Color Emoji", Font.PLAIN, 16);
@@ -50,7 +56,6 @@ public class ChatClientUI extends JFrame {
 
         themeToggle.setFont(emojiFont);
         soundToggle.setFont(emojiFont);
-
         themeToggle.setText(ctx.getCurrentTheme() == Theme.DARK ? "\uD83C\uDF1E" : "\uD83C\uDF19");
         soundToggle.setText(ctx.isSoundEnabled() ? "🔊" : "🔈");
 
@@ -74,7 +79,11 @@ public class ChatClientUI extends JFrame {
         // 🔹 Панель ввода
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(inputField, BorderLayout.CENTER);
-        bottom.add(sendButton, BorderLayout.EAST);
+
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
+        buttonPanel.add(fileButton);
+        buttonPanel.add(sendButton);
+        bottom.add(buttonPanel, BorderLayout.EAST);
 
         // 🔹 Список пользователей
         JPanel rightPanel = new JPanel(new BorderLayout());
@@ -95,37 +104,28 @@ public class ChatClientUI extends JFrame {
         //  Подписки EventBus
         // ==========================
 
-        // 📩 Получено сообщение
         eventBus.subscribe(MessageReceivedEvent.class, e -> {
             appendMessage(e.message().toString(), "default");
-            NotificationManager.showInfo("📩 от " + e.message().getFrom());
             if (ctx.isSoundEnabled()) SoundPlayer.playMessageSound();
         });
 
-        // 🧹 Чат очищен
         eventBus.subscribe(ClearChatEvent.class, e -> {
             clearChat();
             NotificationManager.showInfo("💨 Чат очищен");
-            if (ctx.isSoundEnabled()) SoundPlayer.playSystemSound();
         });
 
-        // 👤 Пользователь подключился
         eventBus.subscribe(UserConnectedEvent.class, e -> {
             appendMessage("[SYSTEM] " + e.username() + " entered the chat.\n", "system");
             SwingUtilities.invokeLater(() -> userListModel.addElement(e.username()));
             NotificationManager.showInfo("🟢 " + e.username() + " вошёл в чат");
-            if (ctx.isSoundEnabled()) SoundPlayer.playSystemSound();
         });
 
-        // 🚪 Пользователь вышел
         eventBus.subscribe(UserDisconnectedEvent.class, e -> {
             appendMessage("[SYSTEM] " + e.username() + " left the chat.\n", "system");
             SwingUtilities.invokeLater(() -> userListModel.removeElement(e.username()));
             NotificationManager.showWarning("🔴 " + e.username() + " покинул чат");
-            if (ctx.isSoundEnabled()) SoundPlayer.playSystemSound();
         });
 
-        // 👥 Обновление списка пользователей
         eventBus.subscribe(UserListUpdatedEvent.class, e -> {
             SwingUtilities.invokeLater(() -> {
                 userListModel.clear();
@@ -133,15 +133,43 @@ public class ChatClientUI extends JFrame {
             });
         });
 
-        // 🎨 Смена темы
         eventBus.subscribe(ThemeChangedEvent.class, e ->
                 SwingUtilities.invokeLater(() -> applyTheme(e.theme())));
+
+        // ==========================
+        // 📁 Подписка на FileTransferEvent
+        // ==========================
+        eventBus.subscribe(FileTransferEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> {
+                switch (e.type()) {
+                    case STARTED -> {
+                        appendMessage("[SYSTEM] 📡 Получение файла: " + e.filename(), "system");
+                        NotificationManager.showInfo("Получение файла: " + e.filename());
+                    }
+                    case PROGRESS -> {
+                        int percent = (int) ((e.transferredBytes() * 100) / e.totalBytes());
+                        if (percent % 10 == 0)
+                            appendMessage("[SYSTEM] 🔄 Передача \"" + e.filename() + "\": " + percent + "%", "system");
+                    }
+                    case COMPLETED -> {
+                        appendMessage("[SYSTEM] ✅ Файл получен: " + e.filename(), "system");
+                        NotificationManager.showInfo("✅ Файл успешно получен: " + e.filename());
+                    }
+                    case FAILED -> {
+                        appendMessage("[SYSTEM] ❌ Ошибка передачи файла " + e.filename() +
+                                ": " + e.errorMessage(), "error");
+                        NotificationManager.showError("Ошибка при передаче: " + e.filename());
+                    }
+                }
+            });
+        });
 
         // ==========================
         //  Обработчики кнопок
         // ==========================
         setupSoundToggle();
         setupThemeToggle();
+        setupFileButton(eventBus);
 
         // 🔌 Подключение к серверу
         connector = new ChatClientConnector(host, port, username, eventBus);
@@ -168,6 +196,10 @@ public class ChatClientUI extends JFrame {
     //  Методы UI
     // ==========================
 
+    private void setupFileButton(EventBus eventBus) {
+        fileButton.addActionListener(e -> handleFileSend(eventBus));
+    }
+
     private void setupSoundToggle() {
         soundToggle.addActionListener(e -> {
             boolean enabled = soundToggle.isSelected();
@@ -182,6 +214,26 @@ public class ChatClientUI extends JFrame {
             ctx.getEventBus().publish(new ThemeChangedEvent(newTheme));
             themeToggle.setText(newTheme == Theme.LIGHT ? "🌞" : "🌙");
         });
+    }
+
+    private void handleFileSend(EventBus eventBus) {
+        JFileChooser chooser = new JFileChooser();
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            new Thread(() -> {
+                FileTransferProgressDialog dialog =
+                        new FileTransferProgressDialog(this, file.getName());
+                dialog.setVisible(true);
+                try {
+                    FileSender.sendFile(file, ctx.getUsername(),
+                            connector.getOutputStream(), eventBus);
+                } catch (Exception ex) {
+                    NotificationManager.showError("Ошибка при отправке файла: " + ex.getMessage());
+                } finally {
+                    dialog.dispose();
+                }
+            }).start();
+        }
     }
 
     private void createStyles(JTextPane pane) {
@@ -256,6 +308,7 @@ public class ChatClientUI extends JFrame {
         sendButton.setBackground(bg);
         sendButton.setForeground(fg);
 
+        // Обновляем цвета стилей
         Style regular = chatPane.getStyle("default");
         StyleConstants.setForeground(regular, fg);
 
@@ -264,6 +317,19 @@ public class ChatClientUI extends JFrame {
 
         Style errorStyle = chatPane.getStyle("error");
         StyleConstants.setForeground(errorStyle, error);
+
+        // 🔥 Новое: перекрашиваем уже выведенный текст
+        StyledDocument doc = chatPane.getStyledDocument();
+        SwingUtilities.invokeLater(() -> {
+            try {
+                // Перекрашиваем весь текст (более корректно, чем просто repaint)
+                String text = doc.getText(0, doc.getLength());
+                doc.remove(0, doc.getLength());
+                doc.insertString(0, text, regular);
+            } catch (BadLocationException e) {
+                e.printStackTrace();
+            }
+        });
 
         chatPane.repaint();
     }
