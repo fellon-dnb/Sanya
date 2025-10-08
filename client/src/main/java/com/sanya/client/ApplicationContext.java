@@ -1,5 +1,6 @@
 package com.sanya.client;
 
+import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.EventBus;
 import com.sanya.events.Theme;
 
@@ -12,7 +13,15 @@ public class ApplicationContext {
     private EventBus eventBus;
     private Theme currentTheme = Theme.DARK;
     private boolean soundEnabled = true;
+    private CommandHandler commandHandler;
 
+    public CommandHandler getCommandHandler() {
+        return commandHandler;
+    }
+
+    public void setCommandHandler(CommandHandler commandHandler) {
+        this.commandHandler = commandHandler;
+    }
 
     public void setEventBus(EventBus eventBus) {
         this.eventBus = eventBus;

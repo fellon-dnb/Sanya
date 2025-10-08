@@ -26,7 +26,6 @@ public class ChatClientUI extends JFrame {
     private final JToggleButton soundToggle = new JToggleButton();
 
     private final ChatClientConnector connector;
-    private final CommandHandler commandHandler;
     private final ApplicationContext ctx;
     private final DefaultListModel<String> userListModel = new DefaultListModel<>();
     private final JList<String> userList = new JList<>(userListModel);
@@ -176,16 +175,7 @@ public class ChatClientUI extends JFrame {
         connector = new ChatClientConnector(host, port, username, eventBus);
         connector.connect();
 
-        // ⚙️ Командный обработчик
-        commandHandler = new CommandHandler(eventBus);
-        commandHandler.getReplRunner().setOutputStream(
-                new LineCallbackOutputStream(line -> {
-                    if (line != null && !line.isEmpty()) {
-                        SwingUtilities.invokeLater(() ->
-                                appendMessage("[SYSTEM] " + line, "system"));
-                    }
-                })
-        );
+
 
         // ❌ При закрытии окна
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -269,7 +259,7 @@ public class ChatClientUI extends JFrame {
 
         if (text.startsWith("/")) {
             try {
-                commandHandler.getReplRunner().execute(text);
+                ctx.getCommandHandler().getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
                 appendMessage("[SYSTEM] Unknown command: " + text.split(" ")[0] + "\n", "error");
             }
