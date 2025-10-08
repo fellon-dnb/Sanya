@@ -1,17 +1,19 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.repl.UnknownCommandException;
-import com.ancevt.replines.core.repl.integration.LineCallbackOutputStream;
-import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.files.FileSender;
 import com.sanya.client.ui.FileTransferProgressDialog;
 import com.sanya.client.ui.NotificationManager;
 import com.sanya.events.*;
 import com.sanya.files.FileTransferEvent;
+import com.sanya.files.FileTransferRequest;
 
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
 
 /**
  * Клиентский UI для чата — Swing-окно с EventBus, темами, звуком, уведомлениями и передачей файлов.
@@ -143,26 +145,58 @@ public class ChatClientUI extends JFrame {
             SwingUtilities.invokeLater(() -> {
                 switch (e.type()) {
                     case STARTED -> {
-                        appendMessage("[SYSTEM] 📡 Получение файла: " + e.filename(), "system");
-                        NotificationManager.showInfo("Получение файла: " + e.filename());
+                        appendMessage("[SYSTEM] Передача файла начата: " + e.filename(), "system");
+                        NotificationManager.showInfo("Начата передача: " + e.filename());
+                        FileTransferProgressDialog.open(this, e.filename(), e.outgoing());
                     }
+
                     case PROGRESS -> {
                         int percent = (int) ((e.transferredBytes() * 100) / e.totalBytes());
-                        if (percent % 10 == 0)
-                            appendMessage("[SYSTEM] 🔄 Передача \"" + e.filename() + "\": " + percent + "%", "system");
+                        FileTransferProgressDialog.updateGlobalProgress(e.filename(), percent);
+                        if (percent % 10 == 0) {
+                            appendMessage("[SYSTEM] " + e.filename() + ": " + percent + "%", "system");
+                        }
                     }
+
                     case COMPLETED -> {
-                        appendMessage("[SYSTEM] ✅ Файл получен: " + e.filename(), "system");
-                        NotificationManager.showInfo("✅ Файл успешно получен: " + e.filename());
+                        FileTransferProgressDialog.close(e.filename());
+                        appendMessage("[SYSTEM] ✅ Файл передан: " + e.filename(), "system");
+                        NotificationManager.showInfo("Файл успешно передан: " + e.filename());
                     }
+
                     case FAILED -> {
-                        appendMessage("[SYSTEM] ❌ Ошибка передачи файла " + e.filename() +
-                                ": " + e.errorMessage(), "error");
-                        NotificationManager.showError("Ошибка при передаче: " + e.filename());
+                        FileTransferProgressDialog.close(e.filename());
+                        appendMessage("[SYSTEM] ❌ Ошибка передачи " + e.filename() + ": " + e.errorMessage(), "error");
+                        NotificationManager.showError("Ошибка передачи файла: " + e.filename());
                     }
                 }
             });
         });
+        eventBus.subscribe(FileIncomingEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    JFileChooser chooser = new JFileChooser();
+                    chooser.setDialogTitle("Принять файл от " + e.request().getSender());
+                    chooser.setSelectedFile(new File(e.request().getFilename()));
+
+                    int result = chooser.showSaveDialog(this);
+                    if (result != JFileChooser.APPROVE_OPTION) {
+                        NotificationManager.showWarning("Передача файла отклонена пользователем.");
+                        return;
+                    }
+
+                    File saveFile = chooser.getSelectedFile();
+
+                    // 🚀 запуск фонового потока приёма
+                    new com.sanya.client.files.FileReceiverThread(e, saveFile, ctx.getEventBus()).start();
+
+                } catch (Exception ex) {
+                    NotificationManager.showError("Ошибка при принятии файла: " + ex.getMessage());
+                }
+            });
+        });
+
+
 
         // ==========================
         //  Обработчики кнопок
@@ -222,7 +256,7 @@ public class ChatClientUI extends JFrame {
             File file = chooser.getSelectedFile();
             new Thread(() -> {
                 FileTransferProgressDialog dialog =
-                        new FileTransferProgressDialog(this, file.getName());
+                        new FileTransferProgressDialog(this, file.getName(), true);
                 dialog.setVisible(true);
                 try {
                     FileSender.sendFile(file, ctx.getUsername(),
@@ -251,6 +285,49 @@ public class ChatClientUI extends JFrame {
         Style error = pane.addStyle("error", def);
         StyleConstants.setForeground(error, Color.RED);
         StyleConstants.setBold(error, true);
+    }
+    private void receiveFile(FileIncomingEvent e, File saveFile) {
+        try (FileOutputStream fos = new FileOutputStream(saveFile)) {
+            ObjectInputStream in = e.input();
+            FileTransferRequest req = e.request();
+
+            long total = req.getSize();
+            long received = 0;
+
+            ctx.getEventBus().publish(new FileTransferEvent(
+                    FileTransferEvent.Type.STARTED,
+                    saveFile.getName(), 0, total, false, null
+            ));
+
+            while (true) {
+                Object obj = in.readObject();
+                if (!(obj instanceof com.sanya.files.FileChunk chunk)) break;
+
+                fos.write(chunk.getData());
+                received += chunk.getData().length;
+
+                ctx.getEventBus().publish(new FileTransferEvent(
+                        FileTransferEvent.Type.PROGRESS,
+                        saveFile.getName(), received, total, false, null
+                ));
+
+                if (chunk.isLast()) break;
+            }
+
+            ctx.getEventBus().publish(new FileTransferEvent(
+                    FileTransferEvent.Type.COMPLETED,
+                    saveFile.getName(), total, total, false, null
+            ));
+
+            NotificationManager.showInfo("Файл сохранён: " + saveFile.getAbsolutePath());
+
+        } catch (Exception ex) {
+            ctx.getEventBus().publish(new FileTransferEvent(
+                    FileTransferEvent.Type.FAILED,
+                    saveFile.getName(), 0, 0, false, ex.getMessage()
+            ));
+            NotificationManager.showError("Ошибка при получении файла: " + ex.getMessage());
+        }
     }
 
     private void handleInput() {

@@ -1,4 +1,4 @@
-package com.sanya.client;
+package com.sanya.client.files;
 
 import com.sanya.events.EventBus;
 import com.sanya.files.FileChunk;
