@@ -2,6 +2,7 @@ package com.sanya.client.commands;
 
 import com.ancevt.replines.core.repl.CommandRegistry;
 import com.ancevt.replines.core.repl.ReplRunner;
+import com.sanya.client.ApplicationContext;
 import com.sanya.events.ClearChatEvent;
 import com.sanya.events.EventBus;
 
@@ -11,8 +12,12 @@ import java.nio.charset.StandardCharsets;
 public class CommandHandler {
 
     private final ReplRunner replRunner;
+    private final ApplicationContext ctx;
 
-    public CommandHandler(EventBus eventBus) {
+    public CommandHandler(ApplicationContext ctx) {
+        this.ctx = ctx;
+
+        EventBus eventBus = ctx.getEventBus();
 
         CommandRegistry registry = new CommandRegistry();
 

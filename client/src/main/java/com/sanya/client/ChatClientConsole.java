@@ -19,16 +19,24 @@ public class ChatClientConsole {
     private final CommandHandler commandHandler;
     private final Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
 
-    public ChatClientConsole(String host, int port, String name) {
-        connector = new ChatClientConnector(host, port, name, eventBus);
+    public ChatClientConsole(String host, int port, String username) {
+        connector = new ChatClientConnector(host, port, username, eventBus);
         connector.connect();
 
         // подписки на события
         eventBus.subscribe(MessageReceivedEvent.class, e -> System.out.println(e.message()));
         eventBus.subscribe(ClearChatEvent.class, e -> clearConsole());
 
+        ApplicationContext ctx = new ApplicationContext();
+        ctx.setHost(host);
+        ctx.setPort(port);
+        ctx.setUsername(username);
+        ctx.setEventBus(eventBus);
+        ctx.setCommandHandler(new CommandHandler(ctx));
+
+
         // создаём обработчик команд (вывод идёт в консоль)
-        commandHandler = new CommandHandler(eventBus);
+        commandHandler = new CommandHandler(ctx);
 
         System.out.println("[SYSTEM] Подключение успешно. Введите сообщение или /help.");
     }
