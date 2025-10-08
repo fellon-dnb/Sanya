@@ -1,6 +1,8 @@
 package com.sanya;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.files.FileChunk;
+import com.sanya.files.FileTransferRequest;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -11,8 +13,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Многопоточный сервер чата.
- * Рассылает системные уведомления о входе/выходе и список активных пользователей.
+ * Многопоточный чат-сервер с поддержкой пересылки файлов.
  */
 public class ChatServer {
 
@@ -23,7 +24,6 @@ public class ChatServer {
         Arguments a = Arguments.parse(args);
         port = a.get(int.class, "--port", 12345);
 
-        // Глобальная установка UTF-8
         System.setProperty("file.encoding", "UTF-8");
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
         System.out.println("Server started on port " + port);
@@ -40,6 +40,7 @@ public class ChatServer {
         private final Socket socket;
         private String clientName;
         private ObjectOutputStream out;
+        private ObjectInputStream in;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -47,30 +48,41 @@ public class ChatServer {
 
         @Override
         public void run() {
-            try (
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream())
-            ) {
-                this.out = out;
+            try {
+                out = new ObjectOutputStream(socket.getOutputStream());
+                in = new ObjectInputStream(socket.getInputStream());
 
-                // Первое сообщение от клиента — handshake
-                Message helloMsg = (Message) in.readObject();
-                clientName = helloMsg.getFrom();
+                // Первый объект — Message от клиента с именем
+                Message hello = (Message) in.readObject();
+                clientName = hello.getFrom();
 
                 clients.put(out, clientName);
                 System.out.println("Client connected: " + clientName);
 
-                // Оповещаем всех о новом участнике
                 broadcast(new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
-
-                // Отправляем обновлённый список активных пользователей
                 updateUserList();
 
-                // Основной цикл получения сообщений
                 while (true) {
-                    Message msg = (Message) in.readObject();
-                    System.out.println("[" + msg.getFrom() + "]: " + msg.getText());
-                    broadcast(msg);
+                    Object obj = in.readObject();
+
+                    if (obj instanceof Message msg) {
+                        System.out.println("[" + msg.getFrom() + "]: " + msg.getText());
+                        broadcast(msg);
+                    }
+                    else if (obj instanceof FileTransferRequest req) {
+                        System.out.println("📁 " + clientName + " is sending file: " + req.getFilename());
+                        // Отправляем уведомление всем пользователям
+                        Message notifyMsg = new Message("SERVER",
+                                req.getSender() + " отправляет файл: " + req.getFilename() + " (" + req.getSize() + " байт)",
+                                Message.Type.SYSTEM);
+                        broadcast(notifyMsg);
+
+// Отправляем сам запрос (чтобы получатели могли принять)
+                        broadcast(req);
+                    }
+                    else if (obj instanceof FileChunk chunk) {
+                        broadcast(chunk); // пересылаем куски файла всем остальным
+                    }
                 }
 
             } catch (Exception e) {
@@ -86,32 +98,24 @@ public class ChatServer {
                 broadcast(new Message("SERVER", clientName + " left the chat", Message.Type.SYSTEM));
                 updateUserList();
             }
-
             try {
                 socket.close();
-            } catch (IOException ignored) {
-            }
+            } catch (IOException ignored) {}
         }
     }
 
-    /**
-     * Рассылает сообщение всем клиентам.
-     */
-    private static void broadcast(Message msg) {
+    private static void broadcast(Object obj) {
         clients.keySet().removeIf(out -> {
             try {
-                out.writeObject(msg);
+                out.writeObject(obj);
                 out.flush();
                 return false;
             } catch (IOException e) {
-                return true; // клиент больше не активен
+                return true;
             }
         });
     }
 
-    /**
-     * Рассылает всем обновлённый список пользователей.
-     */
     private static void updateUserList() {
         String userList = String.join(",", clients.values());
         broadcast(new Message("SERVER", "[SERVER] users: " + userList, Message.Type.SYSTEM));

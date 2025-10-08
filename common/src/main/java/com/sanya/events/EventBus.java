@@ -1,21 +1,22 @@
 package com.sanya.events;
 
-import java.util.function.Consumer;
-
+/**
+ * Расширенный EventBus с подпиской, отпиской и поддержкой иерархии событий.
+ */
 public interface EventBus {
-    /**
-     * Подписывает обработчик на событие определённого типа.
-     *
-     * @param eventType класс события
-     * @param handler   функция-обработчик
-     * @param <E>       тип события
-     */
-    <E> void subscribe(Class<E> eventType, Consumer<E> handler);
 
     /**
-     * Публикует событие для всех подписчиков.
-     *
-     * @param event объект события
+     * Подписывает обработчик на указанный тип события.
+     */
+    <E> void subscribe(Class<E> eventType, EventHandler<? super E> handler);
+
+    /**
+     * Отписывает обработчик от указанного типа события.
+     */
+    <E> void unsubscribe(Class<E> eventType, EventHandler<? super E> handler);
+
+    /**
+     * Публикует событие.
      */
     void publish(Object event);
 }
