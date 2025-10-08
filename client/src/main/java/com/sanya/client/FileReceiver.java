@@ -8,7 +8,7 @@ import com.sanya.files.FileTransferRequest;
 import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.File;
-
+@Deprecated
 public class FileReceiver {
 
     public static void receiveFile(ObjectInputStream in, String saveDir, EventBus eventBus) throws Exception {
