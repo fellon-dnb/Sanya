@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.EventBus;
 import com.sanya.events.SimpleEventBus;
 
@@ -30,6 +31,7 @@ public class Application {
         ctx.setPort(port);
         ctx.setContext(ctx);
         ctx.setEventBus(eventBus);
+        ctx.setCommandHandler(new CommandHandler(ctx));
 
         SwingUtilities.invokeLater(() -> {
             String username = JOptionPane.showInputDialog("Enter your Name:");
