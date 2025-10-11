@@ -1,10 +1,10 @@
 package com.sanya.client.commands;
 
-import com.ancevt.replines.core.repl.CommandRegistry;
+import com.ancevt.replines.core.argument.Arguments;
 import com.ancevt.replines.core.repl.ReplRunner;
+import com.ancevt.replines.core.repl.annotation.ReplCommand;
 import com.sanya.client.ApplicationContext;
 import com.sanya.events.ClearChatEvent;
-import com.sanya.events.EventBus;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -12,45 +12,41 @@ import java.nio.charset.StandardCharsets;
 public class CommandHandler {
 
     private final ReplRunner replRunner;
-    private final ApplicationContext ctx;
 
     public CommandHandler(ApplicationContext ctx) {
-        this.ctx = ctx;
-
-        EventBus eventBus = ctx.getEventBus();
-
-        CommandRegistry registry = new CommandRegistry();
-
-        registry.command("/exit")
-                .action((r, args) -> {
-                    r.println("[SYSTEM] Завершение работы клиента...");
-                    System.exit(0);
-                })
-                .build();
-
-        registry.command("/help")
-                .action((r, args) -> {
-                    r.println("[SYSTEM] Доступные команды:");
-                    r.println(registry.formattedCommandList());
-                })
-                .build();
-
-        registry.command("/clear")
-                .action((r, args) -> {
-                    r.println("[SYSTEM] Очищаю чат...");
-                    eventBus.publish(new ClearChatEvent());
-                })
-                .build();
-
-
-
         replRunner = ReplRunner.builder()
-                .withRegistry(registry)
                 .withOutput(new PrintStream(System.out, true, StandardCharsets.UTF_8))
+                .withCommandFilterPrefix("/")
+                .configure(reg -> reg.register(new CommandDefinitions(ctx)))
                 .build();
     }
 
     public ReplRunner getReplRunner() {
         return replRunner;
+    }
+
+    public static class CommandDefinitions {
+        private final ApplicationContext ctx;
+
+        public CommandDefinitions(ApplicationContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @ReplCommand(name = "/exit", description = "Exit from client")
+        public void exit(ReplRunner repl, Arguments args) {
+            repl.println("[SYSTEM] Завершение работы клиента...");
+            System.exit(0);
+        }
+
+        @ReplCommand(name = "/help", description = "Show help")
+        public void help(ReplRunner repl, Arguments args) {
+            repl.println(repl.getRegistry().formattedCommandList());
+        }
+
+        @ReplCommand(name = "/clear", description = "Clear chat area")
+        public void clear(ReplRunner repl, Arguments args) {
+            repl.println("[SYSTEM] Очищаю чат...");
+            ctx.getEventBus().publish(new ClearChatEvent());
+        }
     }
 }

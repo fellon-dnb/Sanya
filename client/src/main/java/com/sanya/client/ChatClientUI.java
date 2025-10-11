@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.repl.UnknownCommandException;
+import com.ancevt.replines.core.repl.io.BufferedLineOutputStream;
 import com.sanya.client.files.FileSender;
 import com.sanya.client.ui.FileTransferProgressDialog;
 import com.sanya.client.ui.NotificationManager;
@@ -223,6 +224,10 @@ public class ChatClientUI extends JFrame {
         sendButton.addActionListener(e -> handleInput());
         inputField.addActionListener(e -> handleInput());
 
+        ctx.getCommandHandler().getReplRunner().setOutputStream(
+                new BufferedLineOutputStream(text -> appendMessage(text, "default"))
+        );
+
         applyTheme(ctx.getCurrentTheme());
     }
 
@@ -338,7 +343,7 @@ public class ChatClientUI extends JFrame {
             try {
                 ctx.getCommandHandler().getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
-                appendMessage("[SYSTEM] Unknown command: " + text.split(" ")[0] + "\n", "error");
+                appendMessage("[SYSTEM] Unknown command: " + text.split(" ")[0], "error");
             }
         } else {
             ctx.getEventBus().publish(new MessageSendEvent(text));
