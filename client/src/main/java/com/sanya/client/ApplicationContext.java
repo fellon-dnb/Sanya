@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.service.ChatService;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.settings.UiSettings;
 import com.sanya.client.settings.UserSettings;
@@ -14,6 +15,7 @@ public final class ApplicationContext {
     private final UiSettings uiSettings = new UiSettings();
     private final EventBus eventBus = new SimpleEventBus();
     private final CommandHandler commandHandler = new CommandHandler(this);
+    private final Services services = new Services(this);
 
     public ApplicationContext(NetworkSettings networkSettings) {
         this.networkSettings = networkSettings;
@@ -37,5 +39,22 @@ public final class ApplicationContext {
 
     public CommandHandler getCommandHandler() {
         return commandHandler;
+    }
+
+    public Services services() {
+        return services;
+    }
+
+    public static class Services {
+
+        private final ChatService chatService;
+
+        public Services(ApplicationContext ctx) {
+            chatService = new ChatService(ctx.getEventBus());
+        }
+
+        public ChatService chat() {
+            return chatService;
+        }
     }
 }

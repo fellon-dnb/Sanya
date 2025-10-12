@@ -4,7 +4,6 @@ import com.ancevt.replines.core.argument.Arguments;
 import com.ancevt.replines.core.repl.ReplRunner;
 import com.ancevt.replines.core.repl.annotation.ReplCommand;
 import com.sanya.client.ApplicationContext;
-import com.sanya.events.ClearChatEvent;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +45,7 @@ public class CommandHandler {
         @ReplCommand(name = "/clear", description = "Clear chat area")
         public void clear(ReplRunner repl, Arguments args) {
             repl.println("[SYSTEM] Очищаю чат...");
-            ctx.getEventBus().publish(new ClearChatEvent());
+            ctx.services().chat().clearChat();
         }
     }
 }

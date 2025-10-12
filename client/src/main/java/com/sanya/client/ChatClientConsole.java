@@ -2,7 +2,8 @@ package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
 import com.sanya.client.settings.NetworkSettings;
-import com.sanya.events.*;
+import com.sanya.events.ClearChatEvent;
+import com.sanya.events.MessageReceivedEvent;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,7 @@ public class ChatClientConsole {
                     System.out.println("[SYSTEM] Неизвестная команда: " + text);
                 }
             } else {
-                ctx.getEventBus().publish(new MessageSendEvent(text));
+                ctx.services().chat().sendMessage(text);
             }
         }
     }

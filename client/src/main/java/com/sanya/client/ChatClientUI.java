@@ -150,8 +150,9 @@ public class ChatClientUI extends JFrame {
 
     // ========================== События ==========================
     private void subscribeEvents() {
-        eventBus.subscribe(MessageReceivedEvent.class, e -> {
-            appendMessage(e.message().toString(), "default");
+
+        ctx.services().chat().onMessageReceived(msg -> {
+            appendMessage(msg.toString(), "default");
             if (ctx.getUiSettings().isSoundEnabled()) SoundPlayer.playMessageSound();
         });
 
@@ -225,7 +226,7 @@ public class ChatClientUI extends JFrame {
                 appendMessage("[SYSTEM] Unknown command: " + text, "error");
             }
         } else {
-            eventBus.publish(new MessageSendEvent(text));
+            ctx.services().chat().sendMessage(text);
         }
         inputField.setText("");
     }
