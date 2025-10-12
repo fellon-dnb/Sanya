@@ -2,64 +2,40 @@ package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.EventBus;
+import com.sanya.events.SimpleEventBus;
 import com.sanya.events.Theme;
 
-public class ApplicationContext {
+public final class ApplicationContext {
 
-    private String host;
-    private int port;
-    private String username;
-    private EventBus eventBus;
-    private Theme currentTheme = Theme.DARK;
-    private boolean soundEnabled = true;
-    private CommandHandler commandHandler;
+    private final ConnectionInfo connectionInfo;
+    private final UserInfo userInfo = new UserInfo();
+    private final EventBus eventBus = new SimpleEventBus();
+    private final CommandHandler commandHandler = new CommandHandler(this);
+    private Theme theme;
+    private boolean soundEnabled;
 
-    public CommandHandler getCommandHandler() {
-        return commandHandler;
+    public ApplicationContext(ConnectionInfo connectionInfo) {
+        this.connectionInfo = connectionInfo;
     }
 
-    public void setCommandHandler(CommandHandler commandHandler) {
-        this.commandHandler = commandHandler;
-    }
-
-    public void setEventBus(EventBus eventBus) {
-        this.eventBus = eventBus;
+    public ConnectionInfo getConnectionInfo() {
+        return connectionInfo;
     }
 
     public EventBus getEventBus() {
         return eventBus;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public CommandHandler getCommandHandler() {
+        return commandHandler;
     }
 
-    public String getUsername() {
-        return username;
+    public Theme getTheme() {
+        return theme;
     }
 
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public Theme getCurrentTheme() {
-        return currentTheme;
-    }
-
-    public void setCurrentTheme(Theme theme) {
-        this.currentTheme = theme;
+    public void setTheme(Theme theme) {
+        this.theme = theme;
     }
 
     public boolean isSoundEnabled() {
@@ -68,5 +44,9 @@ public class ApplicationContext {
 
     public void setSoundEnabled(boolean soundEnabled) {
         this.soundEnabled = soundEnabled;
+    }
+
+    public UserInfo getUserInfo() {
+        return userInfo;
     }
 }

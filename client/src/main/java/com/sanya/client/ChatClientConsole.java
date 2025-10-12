@@ -1,7 +1,6 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
-import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.*;
 
 import java.io.PrintStream;
@@ -16,8 +15,8 @@ public class ChatClientConsole {
 
     private final EventBus eventBus = new SimpleEventBus();
     private final ChatClientConnector connector;
-    private final CommandHandler commandHandler;
     private final Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
+    private final ApplicationContext ctx;
 
     public ChatClientConsole(String host, int port, String username) {
         connector = new ChatClientConnector(host, port, username, eventBus);
@@ -27,16 +26,7 @@ public class ChatClientConsole {
         eventBus.subscribe(MessageReceivedEvent.class, e -> System.out.println(e.message()));
         eventBus.subscribe(ClearChatEvent.class, e -> clearConsole());
 
-        ApplicationContext ctx = new ApplicationContext();
-        ctx.setHost(host);
-        ctx.setPort(port);
-        ctx.setUsername(username);
-        ctx.setEventBus(eventBus);
-        ctx.setCommandHandler(new CommandHandler(ctx));
-
-
-        // создаём обработчик команд (вывод идёт в консоль)
-        commandHandler = new CommandHandler(ctx);
+        ctx = new ApplicationContext(new ConnectionInfo(host, port));
 
         System.out.println("[SYSTEM] Подключение успешно. Введите сообщение или /help.");
     }
@@ -60,7 +50,7 @@ public class ChatClientConsole {
 
             if (text.startsWith("/")) {
                 try {
-                    commandHandler.getReplRunner().execute(text);
+                    ctx.getCommandHandler().getReplRunner().execute(text);
                 } catch (com.ancevt.replines.core.repl.UnknownCommandException e) {
                     System.out.println("[SYSTEM] Неизвестная команда: " + text);
                 }

@@ -36,12 +36,9 @@ public class ChatClientUI extends JFrame {
 
     public ChatClientUI(ApplicationContext ctx) {
         this.ctx = ctx;
-        String username = ctx.getUsername();
-        String host = ctx.getHost();
-        int port = ctx.getPort();
         EventBus eventBus = ctx.getEventBus();
 
-        setTitle("Chat Client - " + username);
+        setTitle("Chat Client - " + ctx.getUserInfo().getName());
         setSize(700, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -59,7 +56,7 @@ public class ChatClientUI extends JFrame {
 
         themeToggle.setFont(emojiFont);
         soundToggle.setFont(emojiFont);
-        themeToggle.setText(ctx.getCurrentTheme() == Theme.DARK ? "\uD83C\uDF1E" : "\uD83C\uDF19");
+        themeToggle.setText(ctx.getTheme() == Theme.DARK ? "\uD83C\uDF1E" : "\uD83C\uDF19");
         soundToggle.setText(ctx.isSoundEnabled() ? "🔊" : "🔈");
 
         themeToggle.setPreferredSize(new Dimension(60, 60));
@@ -207,10 +204,13 @@ public class ChatClientUI extends JFrame {
         setupFileButton(eventBus);
 
         // 🔌 Подключение к серверу
-        connector = new ChatClientConnector(host, port, username, eventBus);
+        connector = new ChatClientConnector(
+                ctx.getConnectionInfo().getHost(),
+                ctx.getConnectionInfo().getPort(),
+                ctx.getUserInfo().getName(),
+                ctx.getEventBus()
+        );
         connector.connect();
-
-
 
         // ❌ При закрытии окна
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -228,7 +228,7 @@ public class ChatClientUI extends JFrame {
                 new BufferedLineOutputStream(text -> appendMessage(text, "default"))
         );
 
-        applyTheme(ctx.getCurrentTheme());
+        applyTheme(ctx.getTheme());
     }
 
     // ==========================
@@ -264,8 +264,7 @@ public class ChatClientUI extends JFrame {
                         new FileTransferProgressDialog(this, file.getName(), true);
                 dialog.setVisible(true);
                 try {
-                    FileSender.sendFile(file, ctx.getUsername(),
-                            connector.getOutputStream(), eventBus);
+                    FileSender.sendFile(file, ctx.getUserInfo().getName(), connector.getOutputStream(), eventBus);
                 } catch (Exception ex) {
                     NotificationManager.showError("Ошибка при отправке файла: " + ex.getMessage());
                 } finally {

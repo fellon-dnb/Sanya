@@ -1,31 +1,24 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
-import com.sanya.client.commands.CommandHandler;
-import com.sanya.events.EventBus;
-import com.sanya.events.SimpleEventBus;
 
 import javax.swing.*;
 
 public class Application {
 
     public void start(Arguments args) {
-        String host = args.get(String.class, "--host", "localhost");
-        int port = args.get(Integer.class, "--port", 12345);
+        ConnectionInfo connectionInfo = new ConnectionInfo(
+                args.get(String.class, "--host", "localhost"),
+                args.get(Integer.class, "--port", 12345)
+        );
 
-        EventBus eventBus = new SimpleEventBus();
-
-        ApplicationContext ctx = new ApplicationContext();
-        ctx.setHost(host);
-        ctx.setPort(port);
-        ctx.setEventBus(eventBus);
-        ctx.setCommandHandler(new CommandHandler(ctx));
+        ApplicationContext ctx = new ApplicationContext(connectionInfo);
 
         SwingUtilities.invokeLater(() -> {
             String username = JOptionPane.showInputDialog("Enter your Name:");
             if (username == null || username.isBlank()) username = "Anonymous";
 
-            ctx.setUsername(username);
+            ctx.getUserInfo().setName(username);
 
             ChatClientUI ui = new ChatClientUI(ctx);
             ui.setVisible(true);
