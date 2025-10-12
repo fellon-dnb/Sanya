@@ -17,7 +17,6 @@ public class Application {
         SwingUtilities.invokeLater(() -> {
             String username = JOptionPane.showInputDialog("Enter your Name:");
             if (username == null || username.isBlank()) username = "Anonymous";
-
             ctx.getUserInfo().setName(username);
 
             ChatClientUI ui = new ChatClientUI(ctx);
