@@ -57,7 +57,7 @@ public class VoiceRecorder implements Runnable {
 
             byte[] audio = baos.toByteArray();
             ctx.getEventBus().publish(
-                    new VoiceRecordingStoppedEvent(ctx.getUserInfo().getName(), audio)
+                    new VoiceRecordingStoppedEvent(ctx.getUserSettings().getName(), audio)
             );
 
         } catch (Exception e) {

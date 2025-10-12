@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.client.settings.NetworkSettings;
 import com.sanya.events.*;
 
 import java.io.PrintStream;
@@ -14,8 +15,8 @@ public class ChatClientConsole {
     private final ApplicationContext ctx;
 
     public ChatClientConsole(String host, int port, String username) {
-        ctx = new ApplicationContext(new ConnectionInfo(host, port));
-        ctx.getUserInfo().setName(username);
+        ctx = new ApplicationContext(new NetworkSettings(host, port));
+        ctx.getUserSettings().setName(username);
 
         connector = new ChatClientConnector(host, port, username, ctx.getEventBus());
         connector.connect();

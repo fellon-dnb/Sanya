@@ -1,6 +1,6 @@
-package com.sanya.client;
+package com.sanya.client.settings;
 
-public class UserInfo {
+public class UserSettings {
 
     private String name;
 
@@ -14,7 +14,7 @@ public class UserInfo {
 
     @Override
     public String toString() {
-        return "UserInfo{" +
+        return "UserSettings{" +
                 "name='" + name + '\'' +
                 '}';
     }

@@ -51,7 +51,7 @@ public class ChatClientUI extends JFrame {
         this.ctx = ctx;
         this.eventBus = ctx.getEventBus();
 
-        setTitle("Chat Client - " + ctx.getUserInfo().getName());
+        setTitle("Chat Client - " + ctx.getUserSettings().getName());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(800, 550);
         setMinimumSize(new Dimension(800, 550));
@@ -77,8 +77,8 @@ public class ChatClientUI extends JFrame {
 
         // Верхняя панель
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
-        themeToggle.setText(ctx.getTheme() == Theme.DARK ? "☀️" : "🌙");
-        soundToggle.setText(ctx.isSoundEnabled() ? "🔊" : "🔈");
+        themeToggle.setText(ctx.getUiSettings().getTheme() == Theme.DARK ? "☀️" : "🌙");
+        soundToggle.setText(ctx.getUiSettings().isSoundEnabled() ? "🔊" : "🔈");
         topPanel.add(themeToggle);
         topPanel.add(soundToggle);
         add(topPanel, BorderLayout.NORTH);
@@ -118,9 +118,9 @@ public class ChatClientUI extends JFrame {
         bottomPanel.add(recordStatusLabel, BorderLayout.WEST);
         // Подключение
         connector = new ChatClientConnector(
-                ctx.getConnectionInfo().getHost(),
-                ctx.getConnectionInfo().getPort(),
-                ctx.getUserInfo().getName(),
+                ctx.getNetworkSettings().getHost(),
+                ctx.getNetworkSettings().getPort(),
+                ctx.getUserSettings().getName(),
                 eventBus
         );
         connector.connect();
@@ -145,14 +145,14 @@ public class ChatClientUI extends JFrame {
             }
         });
 
-        applyTheme(ctx.getTheme());
+        applyTheme(ctx.getUiSettings().getTheme());
     }
 
     // ========================== События ==========================
     private void subscribeEvents() {
         eventBus.subscribe(MessageReceivedEvent.class, e -> {
             appendMessage(e.message().toString(), "default");
-            if (ctx.isSoundEnabled()) SoundPlayer.playMessageSound();
+            if (ctx.getUiSettings().isSoundEnabled()) SoundPlayer.playMessageSound();
         });
 
         eventBus.subscribe(UserConnectedEvent.class, e ->
@@ -171,7 +171,7 @@ public class ChatClientUI extends JFrame {
                 SwingUtilities.invokeLater(() -> chatPane.setText("")));
 
         eventBus.subscribe(VoiceRecordingEvent.class, e -> {
-            if (!e.username().equals(ctx.getUserInfo().getName())) {
+            if (!e.username().equals(ctx.getUserSettings().getName())) {
                 String text = e.started()
                         ? "[SYSTEM] " + e.username() + " записывает голосовое..."
                         : "[SYSTEM] " + e.username() + " закончил запись.";
@@ -237,7 +237,7 @@ public class ChatClientUI extends JFrame {
             new Thread(() -> {
                 FileTransferProgressDialog.open(this, file.getName(), true);
                 try {
-                    FileSender.sendFile(file, ctx.getUserInfo().getName(), connector.getOutputStream(), eventBus);
+                    FileSender.sendFile(file, ctx.getUserSettings().getName(), connector.getOutputStream(), eventBus);
                 } catch (Exception ex) {
                     NotificationManager.showError("Ошибка при отправке файла: " + ex.getMessage());
                 }
@@ -252,7 +252,7 @@ public class ChatClientUI extends JFrame {
         // запуск рекордера
         recorder = new VoiceRecorder(ctx);
         new Thread(recorder, "VoiceRecorder").start();
-        eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), true));
+        eventBus.publish(new VoiceRecordingEvent(ctx.getUserSettings().getName(), true));
 
         // UI: показать статус и таймер
         recordStartMs = System.currentTimeMillis();
@@ -281,7 +281,7 @@ public class ChatClientUI extends JFrame {
         if (recorder != null) recorder.stop();
         if (recordTimer != null) recordTimer.stop();
 
-        eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), false));
+        eventBus.publish(new VoiceRecordingEvent(ctx.getUserSettings().getName(), false));
 
         // UI: убрать статус
         recordStatusLabel.setVisible(false);
@@ -303,14 +303,14 @@ public class ChatClientUI extends JFrame {
 
     private void toggleTheme() {
         Theme newTheme = themeToggle.isSelected() ? Theme.LIGHT : Theme.DARK;
-        ctx.setTheme(newTheme);
+        ctx.getUiSettings().setTheme(newTheme);
         themeToggle.setText(newTheme == Theme.DARK ? "☀️" : "🌙");
         applyTheme(newTheme);
     }
 
     private void toggleSound() {
         boolean enabled = soundToggle.isSelected();
-        ctx.setSoundEnabled(enabled);
+        ctx.getUiSettings().setSoundEnabled(enabled);
         soundToggle.setText(enabled ? "🔊" : "🔈");
     }
     private static String formatSec(long s) {
