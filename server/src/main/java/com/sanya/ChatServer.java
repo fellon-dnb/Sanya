@@ -8,6 +8,7 @@ import com.sanya.files.FileTransferRequest;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -47,12 +48,13 @@ public class ChatServer {
             this.socket = socket;
         }
 
-        @Override
+
         public void run() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
                 in = new ObjectInputStream(socket.getInputStream());
 
+                // Первое сообщение — имя клиента
                 Message hello = (Message) in.readObject();
                 clientName = hello.getFrom();
                 clients.put(out, clientName);
@@ -68,29 +70,49 @@ public class ChatServer {
                         if (obj instanceof Message msg) {
                             System.out.println("[" + msg.getFrom() + "]: " + msg.getText());
                             broadcast(msg);
+
                         } else if (obj instanceof FileTransferRequest req) {
                             broadcast(req);
+
                         } else if (obj instanceof FileChunk chunk) {
                             broadcast(chunk);
+
                         } else if (obj instanceof VoiceRecordingEvent evt) {
-                            broadcast(evt); // уведомление "записывает голосовое..."
+                            broadcast(evt);
+
                         } else if (obj instanceof VoiceMessageReadyEvent msg) {
-                            broadcast(msg); // готовое голосовое сообщение
+                            broadcast(msg);
+
                         } else if (obj instanceof VoicePlayEvent play) {
-                            broadcast(play); // уведомление о прослушивании
+                            broadcast(play);
                         }
+
                     } catch (EOFException | StreamCorruptedException e) {
-                        break; // клиент закрыл соединение
+                        // Нормальное завершение потока — клиент закрыл соединение
+                        break;
+                    } catch (SocketException e) {
+                        // Соединение разорвано со стороны клиента
+                        System.out.println("Client disconnected (socket reset): " + clientName);
+                        break;
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        // Любые другие ошибки логируем для отладки
+                        System.err.println("Error handling client " + clientName + ": " + e.getMessage());
                         break;
                     }
                 }
-                handleDisconnect();
+
             } catch (Exception e) {
+                System.err.println("Client connection error: " + e.getMessage());
+            } finally {
                 handleDisconnect();
+                try {
+                    if (in != null) in.close();
+                    if (out != null) out.close();
+                    if (socket != null && !socket.isClosed()) socket.close();
+                } catch (IOException ignored) {}
             }
         }
+
 
         private void handleDisconnect() {
             if (clientName != null) {

@@ -14,8 +14,6 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
-import javax.swing.Timer;
-
 
 /**
  * Полноценный клиент чата с поддержкой тем, файлов и голосовых сообщений.
@@ -33,9 +31,6 @@ public class ChatClientUI extends JFrame {
     private final JToggleButton soundToggle = new JToggleButton();
     private final DefaultListModel<String> userListModel = new DefaultListModel<>();
     private final JList<String> userList = new JList<>(userListModel);
-    private final JLabel recordStatusLabel = new JLabel(" ");
-    private Timer recordTimer;
-    private long recordStartTime = 0;
 
     private final ApplicationContext ctx;
     private final EventBus eventBus;
@@ -44,6 +39,13 @@ public class ChatClientUI extends JFrame {
 
     private VoiceRecorder recorder;
     private boolean recording = false;
+
+    // --- UI элементы, связанные с записью
+    private JPanel bottomPanel;
+    private final JLabel recordStatusLabel = new JLabel(" ");
+    private javax.swing.Timer recordTimer;
+    private long recordStartMs = 0;
+
 
     public ChatClientUI(ApplicationContext ctx) {
         this.ctx = ctx;
@@ -55,6 +57,23 @@ public class ChatClientUI extends JFrame {
         setMinimumSize(new Dimension(800, 550));
         setLayout(new BorderLayout());
         setLocationRelativeTo(null);
+
+        //нижния панель
+        bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(inputField, BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new GridLayout(1, 3));
+        buttons.add(fileButton);
+        buttons.add(sendButton);
+        buttons.add(voiceButton);
+        bottomPanel.add(buttons, BorderLayout.EAST);
+
+        add(bottomPanel, BorderLayout.SOUTH);
+
+// статус записи слева, по умолчанию скрыт
+        recordStatusLabel.setVisible(false);
+        bottomPanel.add(recordStatusLabel, BorderLayout.WEST);
+
 
         // Верхняя панель
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
@@ -229,29 +248,52 @@ public class ChatClientUI extends JFrame {
     private void startRecording() {
         if (recording) return;
         recording = true;
+
+        // запуск рекордера
         recorder = new VoiceRecorder(ctx);
         new Thread(recorder, "VoiceRecorder").start();
         eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), true));
 
-        recordStartTime = System.currentTimeMillis();
-        recordTimer = new Timer(200, e -> updateRecordStatus(0));
+        // UI: показать статус и таймер
+        recordStartMs = System.currentTimeMillis();
+        recordStatusLabel.setText("● REC 00:00");
+        recordStatusLabel.setVisible(true);
+        bottomPanel.revalidate();
+        bottomPanel.repaint();
+
+        // подпись на кнопке
+        voiceButton.setText("■ Stop");
+
+        // тикать каждую секунду
+        if (recordTimer != null) recordTimer.stop();
+        recordTimer = new javax.swing.Timer(1000, e -> {
+            long sec = (System.currentTimeMillis() - recordStartMs) / 1000;
+            recordStatusLabel.setText("● REC " + formatSec(sec));
+        });
         recordTimer.start();
-        recordStatusLabel.setText("🎙 Recording...");
-        voiceButton.setText("⏹ Stop");
     }
+
 
     private void stopRecording() {
         if (!recording) return;
         recording = false;
+
         if (recorder != null) recorder.stop();
+        if (recordTimer != null) recordTimer.stop();
+
         eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), false));
 
-        if (recordTimer != null) recordTimer.stop();
-        recordStatusLabel.setText(" ");
+        // UI: убрать статус
+        recordStatusLabel.setVisible(false);
+        recordStatusLabel.setText("");
+        bottomPanel.revalidate();
+        bottomPanel.repaint();
+
         voiceButton.setText("🎤 Voice");
     }
+
     private void updateRecordStatus(double level) {
-        long seconds = (System.currentTimeMillis() - recordStartTime) / 1000;
+        long seconds = (System.currentTimeMillis() - recordStartMs) / 1000;
         int bar = (int) (level * 10);
         StringBuilder vu = new StringBuilder();
         for (int i = 0; i < 10; i++) vu.append(i < bar ? "█" : " ");
@@ -271,19 +313,19 @@ public class ChatClientUI extends JFrame {
         ctx.setSoundEnabled(enabled);
         soundToggle.setText(enabled ? "🔊" : "🔈");
     }
-
+    private static String formatSec(long s) {
+        long mm = s / 60;
+        long ss = s % 60;
+        return String.format("%02d:%02d", mm, ss);
+    }
     // ========================== UI ==========================
     private void createStyles(JTextPane pane) {
-        Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
-
-        if (pane.getStyle("default") == null) {
-            Style regular = pane.addStyle("default", def);
-            StyleConstants.setFontFamily(regular, "Consolas");
-            StyleConstants.setFontSize(regular, 14);
-        }
-        if (pane.getStyle("system") == null) pane.addStyle("system", pane.getStyle("default"));
-        if (pane.getStyle("error") == null) pane.addStyle("error", pane.getStyle("default"));
+        StyledDocument doc = pane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
+        Style regular = doc.addStyle("default", defaultStyle);
+        StyleConstants.setForeground(regular, pane.getForeground());
     }
+
 
     private void appendMessage(String msg, String style) {
         SwingUtilities.invokeLater(() -> {
@@ -309,31 +351,22 @@ public class ChatClientUI extends JFrame {
     }
 
     private void applyTheme(Theme theme) {
-        Color bg, fg, sys, err;
-        if (theme == Theme.DARK) {
-            bg = new Color(25, 25, 25);
-            fg = Color.WHITE;
-            sys = new Color(180, 180, 180);
-            err = new Color(255, 80, 80);
-        } else {
-            bg = Color.WHITE;
-            fg = Color.BLACK;
-            sys = new Color(80, 80, 80);
-            err = new Color(200, 0, 0);
-        }
+        chatPane.setBackground(theme == Theme.DARK ? Color.BLACK : Color.WHITE);
+        chatPane.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
+        userList.setBackground(theme == Theme.DARK ? Color.BLACK : Color.WHITE);
+        userList.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
+        bottomPanel.setBackground(theme == Theme.DARK ? Color.DARK_GRAY : Color.LIGHT_GRAY);
+        recordStatusLabel.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
 
-        chatPane.setBackground(bg);
-        inputField.setBackground(bg);
-        userList.setBackground(bg);
-        chatPane.setForeground(fg);
-        inputField.setForeground(fg);
-        userList.setForeground(fg);
-
-        // обновляем цвета существующих стилей — старый текст перекрашивается
-        StyleConstants.setForeground(chatPane.getStyle("default"), fg);
-        StyleConstants.setForeground(chatPane.getStyle("system"), sys);
-        StyleConstants.setForeground(chatPane.getStyle("error"), err);
-
-        chatPane.repaint();
+        // Пересоздаём стили, чтобы старые сообщения перекрасились
+        createStyles(chatPane);
+        SwingUtilities.invokeLater(() -> {
+            Style style = chatPane.getStyle("default");
+            if (style != null) {
+                doc.setCharacterAttributes(0, doc.getLength(), style, false);
+            }
+            chatPane.repaint();
+        });
     }
+
 }

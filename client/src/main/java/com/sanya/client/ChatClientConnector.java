@@ -127,4 +127,5 @@ public class ChatClientConnector {
         try { if (in != null) in.close(); } catch (IOException ignored) {}
         try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
     }
+
 }
