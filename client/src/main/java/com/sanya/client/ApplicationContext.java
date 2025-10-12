@@ -2,80 +2,31 @@ package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
 import com.sanya.events.EventBus;
+import com.sanya.events.SimpleEventBus;
 import com.sanya.events.Theme;
 
-public class ApplicationContext {
+public final class ApplicationContext {
 
-    private String host;
-    private int port;
-    private ApplicationContext context;
-    private String username;
-    private EventBus eventBus;
-    private Theme currentTheme = Theme.DARK;
+    private final ConnectionInfo connectionInfo;
+    private final UserInfo userInfo = new UserInfo();
+    private final EventBus eventBus = new SimpleEventBus();
+    private final CommandHandler commandHandler = new CommandHandler(this);
+    private Theme theme = Theme.DARK;
     private boolean soundEnabled = true;
-    private CommandHandler commandHandler;
 
-    public CommandHandler getCommandHandler() {
-        return commandHandler;
+    public ApplicationContext(ConnectionInfo connectionInfo) {
+        this.connectionInfo = connectionInfo;
     }
 
-    public void setCommandHandler(CommandHandler commandHandler) {
-        this.commandHandler = commandHandler;
-    }
+    public ConnectionInfo getConnectionInfo() { return connectionInfo; }
+    public EventBus getEventBus() { return eventBus; }
+    public CommandHandler getCommandHandler() { return commandHandler; }
 
-    public void setEventBus(EventBus eventBus) {
-        this.eventBus = eventBus;
-    }
+    public Theme getTheme() { return theme; }
+    public void setTheme(Theme theme) { this.theme = theme; }
 
-    public EventBus getEventBus() {
-        return eventBus;
-    }
+    public boolean isSoundEnabled() { return soundEnabled; }
+    public void setSoundEnabled(boolean soundEnabled) { this.soundEnabled = soundEnabled; }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public ApplicationContext getContext() {
-        return context;
-    }
-
-    public void setContext(ApplicationContext context) {
-        this.context = context;
-    }
-
-    public Theme getCurrentTheme() {
-        return currentTheme;
-    }
-
-    public void setCurrentTheme(Theme theme) {
-        this.currentTheme = theme;
-    }
-
-    public boolean isSoundEnabled() {
-        return soundEnabled;
-    }
-
-    public void setSoundEnabled(boolean soundEnabled) {
-        this.soundEnabled = soundEnabled;
-    }
+    public UserInfo getUserInfo() { return userInfo; }
 }

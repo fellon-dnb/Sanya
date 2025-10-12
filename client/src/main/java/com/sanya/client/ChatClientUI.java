@@ -1,218 +1,143 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.repl.UnknownCommandException;
-import com.ancevt.replines.core.repl.io.BufferedLineOutputStream;
+import com.sanya.client.audio.VoicePlayer;
+import com.sanya.client.audio.VoiceRecorder;
 import com.sanya.client.files.FileSender;
 import com.sanya.client.ui.FileTransferProgressDialog;
 import com.sanya.client.ui.NotificationManager;
 import com.sanya.events.*;
-import com.sanya.files.FileTransferEvent;
-import com.sanya.files.FileTransferRequest;
 
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
 
 /**
- * Клиентский UI для чата — Swing-окно с EventBus, темами, звуком, уведомлениями и передачей файлов.
+ * Полноценный клиент чата с поддержкой тем, файлов и голосовых сообщений.
  */
 public class ChatClientUI extends JFrame {
+
+    private static final int USERS_WIDTH = 180;
 
     private final JTextPane chatPane = new JTextPane();
     private final JTextField inputField = new JTextField();
     private final JButton sendButton = new JButton("Send");
     private final JButton fileButton = new JButton("📁 File");
+    private final JButton voiceButton = new JButton("🎤 Voice");
     private final JToggleButton themeToggle = new JToggleButton();
     private final JToggleButton soundToggle = new JToggleButton();
-
-    private final ChatClientConnector connector;
-    private final ApplicationContext ctx;
     private final DefaultListModel<String> userListModel = new DefaultListModel<>();
     private final JList<String> userList = new JList<>(userListModel);
+
+    private final ApplicationContext ctx;
+    private final EventBus eventBus;
+    private final ChatClientConnector connector;
     private final StyledDocument doc;
+
+    private VoiceRecorder recorder;
+    private boolean recording = false;
+
+    // --- UI элементы, связанные с записью
+    private JPanel bottomPanel;
+    private final JLabel recordStatusLabel = new JLabel(" ");
+    private javax.swing.Timer recordTimer;
+    private long recordStartMs = 0;
+
 
     public ChatClientUI(ApplicationContext ctx) {
         this.ctx = ctx;
-        String username = ctx.getUsername();
-        String host = ctx.getHost();
-        int port = ctx.getPort();
-        EventBus eventBus = ctx.getEventBus();
+        this.eventBus = ctx.getEventBus();
 
-        setTitle("Chat Client - " + username);
-        setSize(700, 500);
+        setTitle("Chat Client - " + ctx.getUserInfo().getName());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(800, 550);
+        setMinimumSize(new Dimension(800, 550));
+        setLayout(new BorderLayout());
         setLocationRelativeTo(null);
 
-        // 🔹 Верхняя панель (тема и звук)
+        //нижния панель
+        bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(inputField, BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new GridLayout(1, 3));
+        buttons.add(fileButton);
+        buttons.add(sendButton);
+        buttons.add(voiceButton);
+        bottomPanel.add(buttons, BorderLayout.EAST);
+
+        add(bottomPanel, BorderLayout.SOUTH);
+
+// статус записи слева, по умолчанию скрыт
+        recordStatusLabel.setVisible(false);
+        bottomPanel.add(recordStatusLabel, BorderLayout.WEST);
+
+
+        // Верхняя панель
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
-        Font emojiFont;
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            emojiFont = new Font("Segoe UI Emoji", Font.PLAIN, 16);
-        } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
-            emojiFont = new Font("Apple Color Emoji", Font.PLAIN, 16);
-        } else {
-            emojiFont = new Font("Noto Color Emoji", Font.PLAIN, 16);
-        }
-
-        themeToggle.setFont(emojiFont);
-        soundToggle.setFont(emojiFont);
-        themeToggle.setText(ctx.getCurrentTheme() == Theme.DARK ? "\uD83C\uDF1E" : "\uD83C\uDF19");
+        themeToggle.setText(ctx.getTheme() == Theme.DARK ? "☀️" : "🌙");
         soundToggle.setText(ctx.isSoundEnabled() ? "🔊" : "🔈");
-
-        themeToggle.setPreferredSize(new Dimension(60, 60));
-        soundToggle.setPreferredSize(new Dimension(60, 60));
-        themeToggle.setFocusPainted(false);
-        soundToggle.setFocusPainted(false);
-
         topPanel.add(themeToggle);
         topPanel.add(soundToggle);
         add(topPanel, BorderLayout.NORTH);
 
-        // 🔹 Чат
+        // Центр — чат
         chatPane.setEditable(false);
+        chatPane.setMargin(new Insets(6, 6, 6, 6));
         doc = chatPane.getStyledDocument();
-        JScrollPane scrollPane = new JScrollPane(chatPane);
-
-        // 🔹 Стили сообщений
         createStyles(chatPane);
+        JScrollPane chatScroll = new JScrollPane(chatPane);
+        chatScroll.setBorder(BorderFactory.createEmptyBorder());
+        add(chatScroll, BorderLayout.CENTER);
 
-        // 🔹 Панель ввода
-        JPanel bottom = new JPanel(new BorderLayout());
-        bottom.add(inputField, BorderLayout.CENTER);
-
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
-        buttonPanel.add(fileButton);
-        buttonPanel.add(sendButton);
-        bottom.add(buttonPanel, BorderLayout.EAST);
-
-        // 🔹 Список пользователей
+        // Правая панель — пользователи
         JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.add(new JLabel("Активные пользователи:"), BorderLayout.NORTH);
-        rightPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
-
-        add(scrollPane, BorderLayout.CENTER);
-        add(bottom, BorderLayout.SOUTH);
+        rightPanel.add(new JLabel("Active users:"), BorderLayout.NORTH);
+        JScrollPane userScroll = new JScrollPane(userList);
+        Dimension uw = new Dimension(USERS_WIDTH, 0);
+        userScroll.setPreferredSize(uw);
+        userScroll.setMinimumSize(uw);
+        userScroll.setMaximumSize(new Dimension(USERS_WIDTH, Integer.MAX_VALUE));
+        rightPanel.setPreferredSize(uw);
+        rightPanel.add(userScroll, BorderLayout.CENTER);
         add(rightPanel, BorderLayout.EAST);
 
-        // 🔹 Цвета по умолчанию для списка
-        userList.setBackground(new Color(30, 30, 30));
-        userList.setForeground(new Color(230, 230, 230));
-        userList.setSelectionBackground(new Color(50, 50, 50));
-        userList.setSelectionForeground(Color.WHITE);
+        // Нижняя панель — ввод
+        JPanel bottomPanel = new JPanel(new BorderLayout(5, 5));
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        bottomPanel.add(inputField, BorderLayout.CENTER);
 
-        // ==========================
-        //  Подписки EventBus
-        // ==========================
-
-        eventBus.subscribe(MessageReceivedEvent.class, e -> {
-            appendMessage(e.message().toString(), "default");
-            if (ctx.isSoundEnabled()) SoundPlayer.playMessageSound();
-        });
-
-        eventBus.subscribe(ClearChatEvent.class, e -> {
-            clearChat();
-            NotificationManager.showInfo("💨 Чат очищен");
-        });
-
-        eventBus.subscribe(UserConnectedEvent.class, e -> {
-            appendMessage("[SYSTEM] " + e.username() + " entered the chat.\n", "system");
-            SwingUtilities.invokeLater(() -> userListModel.addElement(e.username()));
-            NotificationManager.showInfo("🟢 " + e.username() + " вошёл в чат");
-        });
-
-        eventBus.subscribe(UserDisconnectedEvent.class, e -> {
-            appendMessage("[SYSTEM] " + e.username() + " left the chat.\n", "system");
-            SwingUtilities.invokeLater(() -> userListModel.removeElement(e.username()));
-            NotificationManager.showWarning("🔴 " + e.username() + " покинул чат");
-        });
-
-        eventBus.subscribe(UserListUpdatedEvent.class, e -> {
-            SwingUtilities.invokeLater(() -> {
-                userListModel.clear();
-                e.usernames().forEach(userListModel::addElement);
-            });
-        });
-
-        eventBus.subscribe(ThemeChangedEvent.class, e ->
-                SwingUtilities.invokeLater(() -> applyTheme(e.theme())));
-
-        // ==========================
-        // 📁 Подписка на FileTransferEvent
-        // ==========================
-        eventBus.subscribe(FileTransferEvent.class, e -> {
-            SwingUtilities.invokeLater(() -> {
-                switch (e.type()) {
-                    case STARTED -> {
-                        appendMessage("[SYSTEM] Передача файла начата: " + e.filename(), "system");
-                        NotificationManager.showInfo("Начата передача: " + e.filename());
-                        FileTransferProgressDialog.open(this, e.filename(), e.outgoing());
-                    }
-
-                    case PROGRESS -> {
-                        int percent = (int) ((e.transferredBytes() * 100) / e.totalBytes());
-                        FileTransferProgressDialog.updateGlobalProgress(e.filename(), percent);
-                        if (percent % 10 == 0) {
-                            appendMessage("[SYSTEM] " + e.filename() + ": " + percent + "%", "system");
-                        }
-                    }
-
-                    case COMPLETED -> {
-                        FileTransferProgressDialog.close(e.filename());
-                        appendMessage("[SYSTEM] ✅ Файл передан: " + e.filename(), "system");
-                        NotificationManager.showInfo("Файл успешно передан: " + e.filename());
-                    }
-
-                    case FAILED -> {
-                        FileTransferProgressDialog.close(e.filename());
-                        appendMessage("[SYSTEM] ❌ Ошибка передачи " + e.filename() + ": " + e.errorMessage(), "error");
-                        NotificationManager.showError("Ошибка передачи файла: " + e.filename());
-                    }
-                }
-            });
-        });
-        eventBus.subscribe(FileIncomingEvent.class, e -> {
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    JFileChooser chooser = new JFileChooser();
-                    chooser.setDialogTitle("Принять файл от " + e.request().getSender());
-                    chooser.setSelectedFile(new File(e.request().getFilename()));
-
-                    int result = chooser.showSaveDialog(this);
-                    if (result != JFileChooser.APPROVE_OPTION) {
-                        NotificationManager.showWarning("Передача файла отклонена пользователем.");
-                        return;
-                    }
-
-                    File saveFile = chooser.getSelectedFile();
-
-                    // 🚀 запуск фонового потока приёма
-                    new com.sanya.client.files.FileReceiverThread(e, saveFile, ctx.getEventBus()).start();
-
-                } catch (Exception ex) {
-                    NotificationManager.showError("Ошибка при принятии файла: " + ex.getMessage());
-                }
-            });
-        });
-
-
-
-        // ==========================
-        //  Обработчики кнопок
-        // ==========================
-        setupSoundToggle();
-        setupThemeToggle();
-        setupFileButton(eventBus);
-
-        // 🔌 Подключение к серверу
-        connector = new ChatClientConnector(host, port, username, eventBus);
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 5, 0));
+        buttonPanel.add(fileButton);
+        buttonPanel.add(sendButton);
+        buttonPanel.add(voiceButton);
+        bottomPanel.add(buttonPanel, BorderLayout.EAST);
+        add(bottomPanel, BorderLayout.SOUTH);
+        bottomPanel.add(recordStatusLabel, BorderLayout.WEST);
+        // Подключение
+        connector = new ChatClientConnector(
+                ctx.getConnectionInfo().getHost(),
+                ctx.getConnectionInfo().getPort(),
+                ctx.getUserInfo().getName(),
+                eventBus
+        );
         connector.connect();
 
+        subscribeEvents();
 
+        // Обработчики
+        sendButton.addActionListener(e -> handleInput());
+        inputField.addActionListener(e -> handleInput());
+        fileButton.addActionListener(e -> handleFileSend());
+        voiceButton.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { startRecording(); }
+            @Override public void mouseReleased(MouseEvent e) { stopRecording(); }
+        });
+        themeToggle.addActionListener(e -> toggleTheme());
+        soundToggle.addActionListener(e -> toggleSound());
 
-        // ❌ При закрытии окна
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -220,121 +145,75 @@ public class ChatClientUI extends JFrame {
             }
         });
 
-        // 🖊️ Отправка сообщений
-        sendButton.addActionListener(e -> handleInput());
-        inputField.addActionListener(e -> handleInput());
-
-        ctx.getCommandHandler().getReplRunner().setOutputStream(
-                new BufferedLineOutputStream(text -> appendMessage(text, "default"))
-        );
-
-        applyTheme(ctx.getCurrentTheme());
+        applyTheme(ctx.getTheme());
     }
 
-    // ==========================
-    //  Методы UI
-    // ==========================
-
-    private void setupFileButton(EventBus eventBus) {
-        fileButton.addActionListener(e -> handleFileSend(eventBus));
-    }
-
-    private void setupSoundToggle() {
-        soundToggle.addActionListener(e -> {
-            boolean enabled = soundToggle.isSelected();
-            ctx.setSoundEnabled(enabled);
-            soundToggle.setText(enabled ? "🔊" : "🔈");
+    // ========================== События ==========================
+    private void subscribeEvents() {
+        eventBus.subscribe(MessageReceivedEvent.class, e -> {
+            appendMessage(e.message().toString(), "default");
+            if (ctx.isSoundEnabled()) SoundPlayer.playMessageSound();
         });
-    }
 
-    private void setupThemeToggle() {
-        themeToggle.addActionListener(e -> {
-            Theme newTheme = themeToggle.isSelected() ? Theme.LIGHT : Theme.DARK;
-            ctx.getEventBus().publish(new ThemeChangedEvent(newTheme));
-            themeToggle.setText(newTheme == Theme.LIGHT ? "🌞" : "🌙");
-        });
-    }
+        eventBus.subscribe(UserConnectedEvent.class, e ->
+                appendMessage("[SYSTEM] " + e.username() + " joined", "system"));
 
-    private void handleFileSend(EventBus eventBus) {
-        JFileChooser chooser = new JFileChooser();
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File file = chooser.getSelectedFile();
-            new Thread(() -> {
-                FileTransferProgressDialog dialog =
-                        new FileTransferProgressDialog(this, file.getName(), true);
-                dialog.setVisible(true);
-                try {
-                    FileSender.sendFile(file, ctx.getUsername(),
-                            connector.getOutputStream(), eventBus);
-                } catch (Exception ex) {
-                    NotificationManager.showError("Ошибка при отправке файла: " + ex.getMessage());
-                } finally {
-                    dialog.dispose();
-                }
-            }).start();
-        }
-    }
+        eventBus.subscribe(UserDisconnectedEvent.class, e ->
+                appendMessage("[SYSTEM] " + e.username() + " left", "system"));
 
-    private void createStyles(JTextPane pane) {
-        Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
+        eventBus.subscribe(UserListUpdatedEvent.class, e ->
+                SwingUtilities.invokeLater(() -> {
+                    userListModel.clear();
+                    e.usernames().forEach(userListModel::addElement);
+                }));
 
-        Style regular = pane.addStyle("default", def);
-        StyleConstants.setFontFamily(regular, "Consolas");
-        StyleConstants.setFontSize(regular, 14);
-        StyleConstants.setForeground(regular, Color.BLACK);
+        eventBus.subscribe(ClearChatEvent.class, e ->
+                SwingUtilities.invokeLater(() -> chatPane.setText("")));
 
-        Style system = pane.addStyle("system", def);
-        StyleConstants.setItalic(system, true);
-        StyleConstants.setForeground(system, new Color(180, 180, 180));
-
-        Style error = pane.addStyle("error", def);
-        StyleConstants.setForeground(error, Color.RED);
-        StyleConstants.setBold(error, true);
-    }
-    private void receiveFile(FileIncomingEvent e, File saveFile) {
-        try (FileOutputStream fos = new FileOutputStream(saveFile)) {
-            ObjectInputStream in = e.input();
-            FileTransferRequest req = e.request();
-
-            long total = req.getSize();
-            long received = 0;
-
-            ctx.getEventBus().publish(new FileTransferEvent(
-                    FileTransferEvent.Type.STARTED,
-                    saveFile.getName(), 0, total, false, null
-            ));
-
-            while (true) {
-                Object obj = in.readObject();
-                if (!(obj instanceof com.sanya.files.FileChunk chunk)) break;
-
-                fos.write(chunk.getData());
-                received += chunk.getData().length;
-
-                ctx.getEventBus().publish(new FileTransferEvent(
-                        FileTransferEvent.Type.PROGRESS,
-                        saveFile.getName(), received, total, false, null
-                ));
-
-                if (chunk.isLast()) break;
+        eventBus.subscribe(VoiceRecordingEvent.class, e -> {
+            if (!e.username().equals(ctx.getUserInfo().getName())) {
+                String text = e.started()
+                        ? "[SYSTEM] " + e.username() + " записывает голосовое..."
+                        : "[SYSTEM] " + e.username() + " закончил запись.";
+                appendMessage(text, "system");
             }
+        });
 
-            ctx.getEventBus().publish(new FileTransferEvent(
-                    FileTransferEvent.Type.COMPLETED,
-                    saveFile.getName(), total, total, false, null
-            ));
+        // Отправка готового голосового после остановки записи
+        eventBus.subscribe(VoiceRecordingStoppedEvent.class, e -> {
+            SwingUtilities.invokeLater(() -> {
+                int opt = JOptionPane.showConfirmDialog(
+                        this,
+                        "Отправить голосовое сообщение?",
+                        "Голосовое",
+                        JOptionPane.YES_NO_OPTION
+                );
+                if (opt == JOptionPane.YES_OPTION) {
+                    try {
+                        connector.getOutputStream().writeObject(
+                                new VoiceMessageReadyEvent(e.username(), e.data())
+                        );
+                        connector.getOutputStream().flush();
+                    } catch (Exception ex) {
+                        appendMessage("[SYSTEM] Ошибка отправки голосового: " + ex.getMessage(), "error");
+                    }
+                } else {
+                    appendMessage("[SYSTEM] Голосовое отменено.", "system");
+                }
+            });
+        });
 
-            NotificationManager.showInfo("Файл сохранён: " + saveFile.getAbsolutePath());
+        // Получение голосового
+        eventBus.subscribe(VoiceMessageReadyEvent.class, evt -> {
+            appendMessage("[🎤 Голосовое сообщение от " + evt.username() + "]", "system");
+            appendPlayButton(evt.data(), evt.username());
+        });
+        eventBus.subscribe(VoiceLevelEvent.class, e ->
+                SwingUtilities.invokeLater(() -> updateRecordStatus(e.level())));
 
-        } catch (Exception ex) {
-            ctx.getEventBus().publish(new FileTransferEvent(
-                    FileTransferEvent.Type.FAILED,
-                    saveFile.getName(), 0, 0, false, ex.getMessage()
-            ));
-            NotificationManager.showError("Ошибка при получении файла: " + ex.getMessage());
-        }
     }
 
+    // ========================== Основная логика ==========================
     private void handleInput() {
         String text = inputField.getText().trim();
         if (text.isEmpty()) return;
@@ -343,76 +222,151 @@ public class ChatClientUI extends JFrame {
             try {
                 ctx.getCommandHandler().getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
-                appendMessage("[SYSTEM] Unknown command: " + text.split(" ")[0], "error");
+                appendMessage("[SYSTEM] Unknown command: " + text, "error");
             }
         } else {
-            ctx.getEventBus().publish(new MessageSendEvent(text));
+            eventBus.publish(new MessageSendEvent(text));
         }
-
         inputField.setText("");
     }
+
+    private void handleFileSend() {
+        JFileChooser chooser = new JFileChooser();
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            new Thread(() -> {
+                FileTransferProgressDialog.open(this, file.getName(), true);
+                try {
+                    FileSender.sendFile(file, ctx.getUserInfo().getName(), connector.getOutputStream(), eventBus);
+                } catch (Exception ex) {
+                    NotificationManager.showError("Ошибка при отправке файла: " + ex.getMessage());
+                }
+            }).start();
+        }
+    }
+
+    private void startRecording() {
+        if (recording) return;
+        recording = true;
+
+        // запуск рекордера
+        recorder = new VoiceRecorder(ctx);
+        new Thread(recorder, "VoiceRecorder").start();
+        eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), true));
+
+        // UI: показать статус и таймер
+        recordStartMs = System.currentTimeMillis();
+        recordStatusLabel.setText("● REC 00:00");
+        recordStatusLabel.setVisible(true);
+        bottomPanel.revalidate();
+        bottomPanel.repaint();
+
+        // подпись на кнопке
+        voiceButton.setText("■ Stop");
+
+        // тикать каждую секунду
+        if (recordTimer != null) recordTimer.stop();
+        recordTimer = new javax.swing.Timer(1000, e -> {
+            long sec = (System.currentTimeMillis() - recordStartMs) / 1000;
+            recordStatusLabel.setText("● REC " + formatSec(sec));
+        });
+        recordTimer.start();
+    }
+
+
+    private void stopRecording() {
+        if (!recording) return;
+        recording = false;
+
+        if (recorder != null) recorder.stop();
+        if (recordTimer != null) recordTimer.stop();
+
+        eventBus.publish(new VoiceRecordingEvent(ctx.getUserInfo().getName(), false));
+
+        // UI: убрать статус
+        recordStatusLabel.setVisible(false);
+        recordStatusLabel.setText("");
+        bottomPanel.revalidate();
+        bottomPanel.repaint();
+
+        voiceButton.setText("🎤 Voice");
+    }
+
+    private void updateRecordStatus(double level) {
+        long seconds = (System.currentTimeMillis() - recordStartMs) / 1000;
+        int bar = (int) (level * 10);
+        StringBuilder vu = new StringBuilder();
+        for (int i = 0; i < 10; i++) vu.append(i < bar ? "█" : " ");
+        recordStatusLabel.setText(String.format("🎙 [%s] %02ds", vu, seconds));
+    }
+
+
+    private void toggleTheme() {
+        Theme newTheme = themeToggle.isSelected() ? Theme.LIGHT : Theme.DARK;
+        ctx.setTheme(newTheme);
+        themeToggle.setText(newTheme == Theme.DARK ? "☀️" : "🌙");
+        applyTheme(newTheme);
+    }
+
+    private void toggleSound() {
+        boolean enabled = soundToggle.isSelected();
+        ctx.setSoundEnabled(enabled);
+        soundToggle.setText(enabled ? "🔊" : "🔈");
+    }
+    private static String formatSec(long s) {
+        long mm = s / 60;
+        long ss = s % 60;
+        return String.format("%02d:%02d", mm, ss);
+    }
+    // ========================== UI ==========================
+    private void createStyles(JTextPane pane) {
+        StyledDocument doc = pane.getStyledDocument();
+        Style defaultStyle = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
+        Style regular = doc.addStyle("default", defaultStyle);
+        StyleConstants.setForeground(regular, pane.getForeground());
+    }
+
 
     private void appendMessage(String msg, String style) {
         SwingUtilities.invokeLater(() -> {
             try {
                 doc.insertString(doc.getLength(), msg + "\n", doc.getStyle(style));
                 chatPane.setCaretPosition(doc.getLength());
-            } catch (BadLocationException e) {
-                e.printStackTrace();
-            }
+            } catch (BadLocationException ignored) {}
         });
     }
 
-    private void clearChat() {
-        SwingUtilities.invokeLater(() -> chatPane.setText(""));
+    private void appendPlayButton(byte[] voiceData, String username) {
+        SwingUtilities.invokeLater(() -> {
+            JButton playButton = new JButton("▶ " + username);
+            playButton.addActionListener(e ->
+                    new Thread(() -> new VoicePlayer(voiceData).play(), "VoicePlayer").start()
+            );
+            chatPane.setCaretPosition(doc.getLength());
+            chatPane.insertComponent(playButton);
+            try {
+                doc.insertString(doc.getLength(), "\n\n", doc.getStyle("default"));
+            } catch (BadLocationException ignored) {}
+        });
     }
 
     private void applyTheme(Theme theme) {
-        Color bg, fg, system, error;
+        chatPane.setBackground(theme == Theme.DARK ? Color.BLACK : Color.WHITE);
+        chatPane.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
+        userList.setBackground(theme == Theme.DARK ? Color.BLACK : Color.WHITE);
+        userList.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
+        bottomPanel.setBackground(theme == Theme.DARK ? Color.DARK_GRAY : Color.LIGHT_GRAY);
+        recordStatusLabel.setForeground(theme == Theme.DARK ? Color.WHITE : Color.BLACK);
 
-        if (theme == Theme.LIGHT) {
-            bg = new Color(245, 245, 245);
-            fg = Color.BLACK;
-            system = new Color(80, 80, 80);
-            error = new Color(200, 30, 30);
-        } else {
-            bg = new Color(25, 25, 25);
-            fg = new Color(230, 230, 230);
-            system = new Color(180, 180, 180);
-            error = new Color(255, 100, 100);
-        }
-
-        chatPane.setBackground(bg);
-        userList.setBackground(theme == Theme.LIGHT ? new Color(240, 240, 240) : new Color(30, 30, 30));
-        userList.setForeground(fg);
-        inputField.setBackground(bg.darker());
-        inputField.setForeground(fg);
-        sendButton.setBackground(bg);
-        sendButton.setForeground(fg);
-
-        // Обновляем цвета стилей
-        Style regular = chatPane.getStyle("default");
-        StyleConstants.setForeground(regular, fg);
-
-        Style systemStyle = chatPane.getStyle("system");
-        StyleConstants.setForeground(systemStyle, system);
-
-        Style errorStyle = chatPane.getStyle("error");
-        StyleConstants.setForeground(errorStyle, error);
-
-        // 🔥 Новое: перекрашиваем уже выведенный текст
-        StyledDocument doc = chatPane.getStyledDocument();
+        // Пересоздаём стили, чтобы старые сообщения перекрасились
+        createStyles(chatPane);
         SwingUtilities.invokeLater(() -> {
-            try {
-                // Перекрашиваем весь текст (более корректно, чем просто repaint)
-                String text = doc.getText(0, doc.getLength());
-                doc.remove(0, doc.getLength());
-                doc.insertString(0, text, regular);
-            } catch (BadLocationException e) {
-                e.printStackTrace();
+            Style style = chatPane.getStyle("default");
+            if (style != null) {
+                doc.setCharacterAttributes(0, doc.getLength(), style, false);
             }
+            chatPane.repaint();
         });
-
-        chatPane.repaint();
     }
+
 }
