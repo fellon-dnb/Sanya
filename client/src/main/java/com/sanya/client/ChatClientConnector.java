@@ -2,20 +2,12 @@ package com.sanya.client;
 
 import com.sanya.Message;
 import com.sanya.events.*;
+import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferRequest;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.Arrays;
-import java.util.List;
 
-/**
- * ChatClientConnector — отвечает за сетевое взаимодействие клиента:
- * подключение, приём и отправка сообщений, уведомления через EventBus.
- *
- * Полностью независим от UI — работает одинаково
- * для Swing, консоли или будущих клиентов (Qt, Electron и т.д.).
- */
 public class ChatClientConnector {
 
     private final String host;
@@ -26,6 +18,8 @@ public class ChatClientConnector {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
+    private Thread readerThread;
+    private volatile boolean connected = false;
 
     public ChatClientConnector(String host, int port, String username, EventBus eventBus) {
         this.host = host;
@@ -33,92 +27,105 @@ public class ChatClientConnector {
         this.username = username;
         this.eventBus = eventBus;
 
-        // Подписываемся на событие отправки сообщения
-        eventBus.subscribe(MessageSendEvent.class, e -> sendMessage(e.text()));
+        // подписка на исходящие текстовые сообщения
+        eventBus.subscribe(MessageSendEvent.class, e -> safeSendMessage(e.text()));
     }
 
     /** Подключение к серверу */
     public void connect() {
-        new Thread(() -> {
-            try {
-                socket = new Socket(host, port);
-                out = new ObjectOutputStream(socket.getOutputStream());
-                in = new ObjectInputStream(socket.getInputStream());
+        try {
+            socket = new Socket(host, port);
 
-                // уведомляем о подключении
-                eventBus.publish(new UserConnectedEvent(username));
+            // важно: сначала out, потом flush, потом in
+            out = new ObjectOutputStream(socket.getOutputStream());
+            out.flush();
+            in = new ObjectInputStream(socket.getInputStream());
 
-                // отправляем приветственное сообщение
-                out.writeObject(new Message(username, "<<<HELLO>>>"));
-                out.flush();
+            connected = true;
 
-                // основной цикл приёма данных
-                while (true) {
-                    Object obj = in.readObject();
+            // handshake
+            Message hello = new Message(username, "<<<HELLO>>>");
+            out.writeObject(hello);
+            out.flush();
 
-                    if (obj instanceof Message msg) {
-                        handleSystemOrChatMessage(msg);
-                    }
-                    else if (obj instanceof FileTransferRequest req) {
-                        // ⚡ публикуем событие о входящем файле
-                        eventBus.publish(new FileIncomingEvent(req, in));
-                    }
-                }
+            // запускаем поток чтения
+            readerThread = new Thread(this::listenLoop, "ChatClientReader");
+            readerThread.start();
 
-            } catch (Exception e) {
-                eventBus.publish(new UserDisconnectedEvent(username));
-            }
-        }, "ChatClient-Listener").start();
+            eventBus.publish(new UserConnectedEvent(username));
+
+        } catch (IOException e) {
+            eventBus.publish(new MessageReceivedEvent(
+                    new Message("SYSTEM", "Connection failed: " + e.getMessage(), Message.Type.SYSTEM)
+            ));
+            close();
+        } catch (Exception e) {
+            eventBus.publish(new MessageReceivedEvent(
+                    new Message("SYSTEM", "Unexpected error: " + e.getMessage(), Message.Type.SYSTEM)
+            ));
+            close();
+        }
     }
 
-    /** Разбор текстовых сообщений (системные, пользовательские, список пользователей) */
-    private void handleSystemOrChatMessage(Message msg) {
-        String text = msg.getText();
+    /** Основной цикл чтения данных с сервера */
+    private void listenLoop() {
+        try {
+            while (connected && !socket.isClosed()) {
+                Object obj = in.readObject();
 
-        if (text.contains("entered the chat")) {
-            String name = text.replace("[SERVER]", "")
-                    .replace("entered the chat", "").trim();
-            eventBus.publish(new UserConnectedEvent(name));
+                if (obj instanceof Message msg) {
+                    eventBus.publish(new MessageReceivedEvent(msg));
+                } else if (obj instanceof UserListUpdatedEvent list) {
+                    eventBus.publish(list);
+                } else if (obj instanceof FileTransferRequest req) {
+                    eventBus.publish(new FileIncomingEvent(req, in));
+                } else if (obj instanceof FileChunk chunk) {
+                    if ("voice".equals(chunk.getFilename())) {
+                        eventBus.publish(new VoiceReceivedEvent(chunk.getData(), chunk.isLast()));
+                    }
 
-        } else if (text.contains("left the chat")) {
-            String name = text.replace("[SERVER]", "")
-                    .replace("left the chat", "").trim();
-            eventBus.publish(new UserDisconnectedEvent(name));
+                }
+                else if (obj instanceof VoiceMessageReadyEvent evt) {
+                    eventBus.publish(evt);
+                }
 
-        } else if (text.startsWith("[SERVER] users:")) {
-            String list = text.replace("[SERVER] users:", "").trim();
-            List<String> users = Arrays.asList(list.split(","));
-            eventBus.publish(new UserListUpdatedEvent(users));
-
-        } else {
-            eventBus.publish(new MessageReceivedEvent(msg));
+            }
+        } catch (EOFException | StreamCorruptedException e) {
+            // клиент или сервер закрыл соединение
+        } catch (Exception e) {
+            eventBus.publish(new MessageReceivedEvent(
+                    new Message("SYSTEM", "Read error: " + e.getMessage(), Message.Type.SYSTEM)
+            ));
+        } finally {
+            close();
+            eventBus.publish(new UserDisconnectedEvent(username));
         }
     }
 
     /** Отправка текстового сообщения */
-    public void sendMessage(String text) {
+    private void safeSendMessage(String text) {
+        if (out == null) return;
         try {
-            if (out != null) {
-                out.writeObject(new Message(username, text));
-                out.flush();
-            }
+            out.writeObject(new Message(username, text));
+            out.flush();
         } catch (IOException e) {
             eventBus.publish(new MessageReceivedEvent(
-                    new Message("SYSTEM",
-                            "Ошибка отправки: " + e.getMessage(),
-                            Message.Type.SYSTEM)
+                    new Message("SYSTEM", "Send failed: " + e.getMessage(), Message.Type.SYSTEM)
             ));
         }
     }
 
-    /** Закрытие соединения */
-    public void close() {
-        try {
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (IOException ignored) {}
-    }
-
+    /** Получить поток для отправки файлов/голоса */
     public ObjectOutputStream getOutputStream() {
         return out;
     }
+
+    /** Закрытие соединения */
+    public void close() {
+        connected = false;
+        try { if (out != null) out.close(); } catch (IOException ignored) {}
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+    }
+
 }
