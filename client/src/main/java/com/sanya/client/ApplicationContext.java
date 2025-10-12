@@ -8,7 +8,6 @@ public class ApplicationContext {
 
     private String host;
     private int port;
-    private ApplicationContext context;
     private String username;
     private EventBus eventBus;
     private Theme currentTheme = Theme.DARK;
@@ -53,14 +52,6 @@ public class ApplicationContext {
 
     public void setPort(int port) {
         this.port = port;
-    }
-
-    public ApplicationContext getContext() {
-        return context;
-    }
-
-    public void setContext(ApplicationContext context) {
-        this.context = context;
     }
 
     public Theme getCurrentTheme() {
