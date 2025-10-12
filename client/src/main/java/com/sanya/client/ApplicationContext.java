@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.ui.UIFacade;
 import com.sanya.events.EventBus;
 import com.sanya.events.Theme;
 
@@ -14,6 +15,7 @@ public class ApplicationContext {
     private Theme currentTheme = Theme.DARK;
     private boolean soundEnabled = true;
     private CommandHandler commandHandler;
+    private UIFacade uiFacade;
 
     public CommandHandler getCommandHandler() {
         return commandHandler;
@@ -77,5 +79,12 @@ public class ApplicationContext {
 
     public void setSoundEnabled(boolean soundEnabled) {
         this.soundEnabled = soundEnabled;
+    }
+    public void setUiFacade(UIFacade uiFacade) {
+        this.uiFacade = uiFacade;
+    }
+
+    public UIFacade getUiFacade() {
+        return uiFacade;
     }
 }
