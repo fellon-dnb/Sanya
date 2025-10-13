@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.repl.UnknownCommandException;
+import com.ancevt.replines.core.repl.io.BufferedLineOutputStream;
 import com.sanya.client.audio.VoicePlayer;
 import com.sanya.client.audio.VoiceRecorder;
 import com.sanya.client.files.FileSender;
@@ -43,7 +44,7 @@ public class ChatClientUI extends JFrame {
     // --- UI элементы, связанные с записью
     private JPanel bottomPanel;
     private final JLabel recordStatusLabel = new JLabel(" ");
-    private javax.swing.Timer recordTimer;
+    private Timer recordTimer;
     private long recordStartMs = 0;
 
 
@@ -131,6 +132,14 @@ public class ChatClientUI extends JFrame {
         sendButton.addActionListener(e -> handleInput());
         inputField.addActionListener(e -> handleInput());
         fileButton.addActionListener(e -> handleFileSend());
+
+        ctx.getCommandHandler().getReplRunner().setOutputStream(
+                new BufferedLineOutputStream(line -> {
+                    System.out.println(line);
+                    appendMessage(line, "default");
+                })
+        );
+
         voiceButton.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { startRecording(); }
             @Override public void mouseReleased(MouseEvent e) { stopRecording(); }
@@ -221,6 +230,8 @@ public class ChatClientUI extends JFrame {
 
         if (text.startsWith("/")) {
             try {
+                appendMessage(text, "default");
+                System.out.println(text);
                 ctx.getCommandHandler().getReplRunner().execute(text);
             } catch (UnknownCommandException e) {
                 appendMessage("[SYSTEM] Unknown command: " + text, "error");

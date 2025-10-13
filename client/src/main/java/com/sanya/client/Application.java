@@ -13,17 +13,17 @@ public class Application {
                 args.get(Integer.class, new String[]{"--port", "-p"}, 12345)
         );
 
-        String usernameCli = args.get(String.class, new String[]{"--username", "-u"}, "");
+        String usernameFromCli = args.get(String.class, new String[]{"--username", "-u"}, "");
 
         ApplicationContext ctx = new ApplicationContext(networkSettings);
 
         SwingUtilities.invokeLater(() -> {
-            if (usernameCli.isEmpty()) {
+            if (usernameFromCli.isEmpty()) {
                 String username = JOptionPane.showInputDialog("Enter your Name:");
                 if (username == null || username.isBlank()) username = "Anonymous";
                 ctx.getUserSettings().setName(username);
             } else {
-                ctx.getUserSettings().setName(usernameCli);
+                ctx.getUserSettings().setName(usernameFromCli);
             }
 
             ChatClientUI ui = new ChatClientUI(ctx);
