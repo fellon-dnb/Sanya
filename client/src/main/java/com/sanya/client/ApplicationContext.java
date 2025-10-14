@@ -3,6 +3,7 @@ package com.sanya.client;
 import com.sanya.client.commands.CommandHandler;
 import com.sanya.client.di.DependencyContainer;
 import com.sanya.client.service.ChatService;
+import com.sanya.client.service.audio.VoiceService;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.settings.UiSettings;
 import com.sanya.client.settings.UserSettings;
@@ -36,6 +37,7 @@ public final class ApplicationContext {
         di.registerSingleton(EventBus.class, () -> eventBus);
         di.registerSingleton(ChatService.class, () -> services.chat());
         di.registerSingleton(ApplicationContext.class, () -> this);
+        di.registerSingleton(VoiceService.class, () -> new VoiceService(this));
     }
 
     //  доступ к DI

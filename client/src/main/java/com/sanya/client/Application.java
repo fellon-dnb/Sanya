@@ -38,7 +38,7 @@ public class Application {
             ChatClientUI ui = new ChatClientUI(ctx);
 
             // === Инициализация фасада ===
-            UIFacade facade = new SwingUIFacade(ui);
+            UIFacade facade = new SwingUIFacade(ui, ctx);
             ctx.setUIFacade(facade);
 
             // === Контроллер (события UI ↔ логика) ===

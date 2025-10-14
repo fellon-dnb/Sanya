@@ -1,8 +1,10 @@
 package com.sanya.client.ui.swing;
 
+import com.sanya.client.ApplicationContext;
 import com.sanya.client.ui.UIFacade;
 import com.sanya.client.ChatClientUI;
 import com.sanya.client.ui.NotificationManager;
+import com.sanya.events.SystemMessageEvent;
 
 import javax.swing.*;
 import java.io.File;
@@ -11,9 +13,14 @@ import java.util.List;
 public class SwingUIFacade implements UIFacade {
 
     private final ChatClientUI ui;
-
-    public SwingUIFacade(ChatClientUI ui) {
+    private final ApplicationContext ctx;
+    public SwingUIFacade(ChatClientUI ui, ApplicationContext ctx) {
         this.ui = ui;
+        this.ctx = ctx;
+
+        ctx.getEventBus().subscribe(SystemMessageEvent.class, e ->
+                NotificationManager.showError(e.message())
+        );
     }
 
     @Override
