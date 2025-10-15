@@ -11,6 +11,7 @@ import com.sanya.events.system.ConnectionLostEvent;
 
 import javax.swing.*;
 import java.io.InputStream;
+import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -76,7 +77,7 @@ public class Application {
                 ui.setVisible(true);
 
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    System.out.println("[Application] Shutdown hook executed");
+                    log.info("Shutdown hook executed");
                     if (ctx.getEventSubscriptionsManager() != null) {
                         ctx.getEventSubscriptionsManager().unsubscribeAll();
                     }
@@ -88,7 +89,7 @@ public class Application {
                         "Failed to start application: " + e.getMessage(),
                         "Error",
                         JOptionPane.ERROR_MESSAGE);
-                e.printStackTrace();
+                log.log(Level.SEVERE, "Startup failed", e);
                 System.exit(1);
             }
         });

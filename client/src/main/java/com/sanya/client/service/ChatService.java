@@ -7,6 +7,8 @@ import com.sanya.events.ui.ClearChatEvent;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * ChatService управляет взаимодействием чата через EventBus.
@@ -14,55 +16,53 @@ import java.util.function.Supplier;
  */
 public class ChatService {
 
-    private final EventBus bus;
+    private static final Logger log = Logger.getLogger(ChatService.class.getName());
 
-    // supplier проверяет активность соединения
+    private final EventBus bus;
     private Supplier<Boolean> isConnectedSupplier;
-    // sender отвечает за отправку объектов
     private Consumer<Object> objectSender;
 
     public ChatService(EventBus bus) {
         this.bus = bus;
     }
 
-    /**
-     * Привязка транспорта: логика отправки и проверки соединения.
-     */
-    public void attachOutputSupplier(Supplier<Boolean> isConnectedSupplier,
-                                     Consumer<Object> objectSender) {
+    public void attachOutputSupplier(Supplier<Boolean> isConnectedSupplier, Consumer<Object> objectSender) {
         this.isConnectedSupplier = isConnectedSupplier;
         this.objectSender = objectSender;
+        log.info("ChatService transport attached");
     }
 
-    /** Отправка текстового сообщения. */
     public void sendMessage(String text) {
         bus.publish(new MessageSendEvent(text));
+        log.fine("Published MessageSendEvent: " + text);
     }
 
-    /** Очистка чата. */
     public void clearChat() {
         bus.publish(new ClearChatEvent());
+        log.info("Chat cleared");
     }
 
-    /** Проверка активного соединения. */
     public boolean isConnected() {
-        return isConnectedSupplier != null && isConnectedSupplier.get();
+        boolean connected = isConnectedSupplier != null && isConnectedSupplier.get();
+        log.fine("Connection check: " + connected);
+        return connected;
     }
 
-    /** Отправка объекта (файл, голос, и т.п.) напрямую в транспорт. */
     public void sendObject(Object obj) {
         if (objectSender == null) {
+            log.warning("Attempt to send object with no active transport");
             bus.publish(new SystemMessageEvent("[ERROR] Transport not attached"));
             return;
         }
         try {
             objectSender.accept(obj);
+            log.fine("Object sent: " + obj.getClass().getSimpleName());
         } catch (Exception e) {
+            log.log(Level.SEVERE, "Send failed", e);
             bus.publish(new SystemMessageEvent("[ERROR] Send failed: " + e.getMessage()));
         }
     }
 
-    /** Получение EventBus. */
     public EventBus getBus() {
         return bus;
     }
