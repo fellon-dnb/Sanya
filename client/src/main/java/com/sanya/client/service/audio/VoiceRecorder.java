@@ -8,6 +8,8 @@ import com.sanya.events.voice.VoiceRecordingStoppedEvent;
 import javax.sound.sampled.*;
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.sanya.client.service.audio.AudioConfig.getFormat;
 
@@ -17,6 +19,7 @@ import static com.sanya.client.service.audio.AudioConfig.getFormat;
  */
 public class VoiceRecorder implements Runnable {
 
+    private static final Logger log = Logger.getLogger(VoiceRecorder.class.getName());
     private static final long MAX_DURATION_MS = 60000; // максимум 1 минута
     private static final int BUFFER_SIZE = 4096;
 
@@ -31,18 +34,20 @@ public class VoiceRecorder implements Runnable {
     /** Запустить запись (игнорирует повторные вызовы) */
     public void start() {
         if (running.get()) {
-            System.out.println("[VoiceRecorder] Already running — ignored start");
+            log.warning("[VoiceRecorder] Already running — ignored start");
             return;
         }
         running.set(true);
         thread = new Thread(this, "VoiceRecorder");
         thread.start();
+        log.info("[VoiceRecorder] Recording thread started");
     }
 
     /** Остановить запись */
     public void stop() {
         if (!running.get()) return;
         running.set(false);
+        log.info("[VoiceRecorder] Stop requested");
     }
 
     /** Проверка состояния */
@@ -58,6 +63,7 @@ public class VoiceRecorder implements Runnable {
         if (!AudioSystem.isLineSupported(info)) {
             ctx.getEventBus().publish(new SystemMessageEvent(
                     "[ERROR] Аудио вход не поддерживается: " + format));
+            log.severe("[VoiceRecorder] Audio input not supported: " + format);
             return;
         }
 
@@ -71,7 +77,7 @@ public class VoiceRecorder implements Runnable {
             long startTime = System.currentTimeMillis();
             long lastLevelUpdate = 0;
 
-            System.out.println("[VoiceRecorder] Recording started");
+            log.info("[VoiceRecorder] Recording started");
 
             while (running.get()) {
                 int bytes = mic.read(buf, 0, buf.length);
@@ -87,7 +93,7 @@ public class VoiceRecorder implements Runnable {
                 }
 
                 if (now - startTime > MAX_DURATION_MS) {
-                    System.out.println("[VoiceRecorder] Max duration reached");
+                    log.warning("[VoiceRecorder] Max duration reached");
                     break;
                 }
             }
@@ -99,14 +105,14 @@ public class VoiceRecorder implements Runnable {
             ctx.getEventBus().publish(
                     new VoiceRecordingStoppedEvent(ctx.getUserSettings().getName(), audio)
             );
-
-            System.out.println("[VoiceRecorder] Recording finished, bytes: " + audio.length);
+            log.info("[VoiceRecorder] Recording finished, bytes: " + audio.length);
 
         } catch (LineUnavailableException e) {
+            log.log(Level.SEVERE, "[VoiceRecorder] Audio line unavailable", e);
             ctx.getEventBus().publish(new SystemMessageEvent("[ERROR] Микрофон недоступен: " + e.getMessage()));
         } catch (Exception e) {
+            log.log(Level.SEVERE, "[VoiceRecorder] Recording error", e);
             ctx.getEventBus().publish(new SystemMessageEvent("[ERROR] Ошибка записи звука: " + e.getMessage()));
-            e.printStackTrace();
         } finally {
             running.set(false);
         }
