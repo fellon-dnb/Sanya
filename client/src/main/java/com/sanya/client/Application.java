@@ -10,12 +10,16 @@ import com.sanya.client.facade.swing.SwingUIFacade;
 import com.sanya.events.system.ConnectionLostEvent;
 
 import javax.swing.*;
+import java.io.InputStream;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 /**
  * Точка входа клиента чата.
  * Настраивает контекст, GUI и сетевое подключение.
  */
 public class Application {
+    private static final Logger log = Logger.getLogger(Application.class.getName());
 
     public void start(Arguments args) {
         NetworkSettings networkSettings = new NetworkSettings(
@@ -91,11 +95,24 @@ public class Application {
     }
 
     public static void main(String[] args) {
+        // === Настройка логгера ===
+        try (InputStream input = Application.class.getResourceAsStream("/logging.properties")) {
+            if (input != null) {
+                LogManager.getLogManager().readConfiguration(input);
+                log.info("Logging configuration loaded successfully");
+            } else {
+                System.err.println("[WARN] logging.properties not found in resources");
+            }
+        } catch (Exception e) {
+            System.err.println("[WARN] Failed to initialize logging: " + e.getMessage());
+        }
+
+        // === Запуск приложения ===
         try {
             new Application().start(Arguments.parse(args));
         } catch (Exception e) {
-            System.err.println("Fatal error starting application: " + e.getMessage());
-            e.printStackTrace();
+            log.severe("Fatal error starting application: " + e.getMessage());
+            e.printStackTrace(); // опционально можно убрать, если все пишем в лог
             System.exit(1);
         }
     }
