@@ -29,6 +29,7 @@ public class ChatTransport implements AutoCloseable {
     public ChatTransport(String host, int port) {
         this.host = host;
         this.port = port;
+        log.config("ChatTransport created for " + host + ":" + port);
     }
 
     /** Установка слушателя событий (обработка входящих данных и ошибок). */
@@ -38,8 +39,12 @@ public class ChatTransport implements AutoCloseable {
 
     /** Подключение к серверу. */
     public synchronized void connect() throws IOException {
-        if (connected.get()) return;
+        if (connected.get()) {
+            log.config("Already connected, skipping connect()");
+            return;
+        }
 
+        log.config("Connecting to " + host + ":" + port);
         socket = new Socket(host, port);
         socket.setSoTimeout(0);
 
@@ -48,12 +53,13 @@ public class ChatTransport implements AutoCloseable {
         in = new ObjectInputStream(socket.getInputStream());
 
         connected.set(true);
+        log.config("Socket connected to " + socket.getRemoteSocketAddress());
 
         readerThread = new Thread(this::listenLoop, "ChatTransport-Reader");
         readerThread.setDaemon(true);
         readerThread.start();
 
-        log.info(() -> "[ChatTransport] Connected to " + host + ":" + port);
+        log.info("Connected to " + host + ":" + port);
     }
 
     /** Основной цикл чтения данных. */
@@ -64,10 +70,10 @@ public class ChatTransport implements AutoCloseable {
                 if (listener != null) listener.onMessage(obj);
             }
         } catch (EOFException | SocketException e) {
-            log.warning("[ChatTransport] Disconnected: " + e.getMessage());
+            log.info("Disconnected: " + e.getMessage());
             if (listener != null) listener.onDisconnect(e);
         } catch (Exception e) {
-            log.log(Level.SEVERE, "[ChatTransport] Read error", e);
+            log.log(Level.SEVERE, "Read error", e);
             if (listener != null) listener.onDisconnect(e);
         } finally {
             close();
@@ -82,6 +88,7 @@ public class ChatTransport implements AutoCloseable {
         synchronized (out) {
             out.writeObject(obj);
             out.flush();
+            log.fine("Sent object: " + obj.getClass().getSimpleName());
         }
     }
 
@@ -95,7 +102,7 @@ public class ChatTransport implements AutoCloseable {
     public synchronized void close() {
         if (!connected.getAndSet(false)) return;
 
-        log.info("[ChatTransport] Closing transport");
+        log.config("Closing ChatTransport for " + host + ":" + port);
         try { if (in != null) in.close(); } catch (IOException ignored) {}
         try { if (out != null) out.close(); } catch (IOException ignored) {}
         try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
@@ -105,6 +112,7 @@ public class ChatTransport implements AutoCloseable {
         socket = null;
 
         if (listener != null) listener.onDisconnect(null);
+        log.config("ChatTransport closed cleanly");
     }
 
     /** Интерфейс слушателя для обратных вызовов. */
