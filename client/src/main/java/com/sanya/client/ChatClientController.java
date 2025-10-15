@@ -1,7 +1,9 @@
 package com.sanya.client;
 
-import com.sanya.client.ui.UIFacade;
-import com.sanya.events.MessageSendEvent;
+import com.sanya.client.service.files.FileSender;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.events.chat.MessageSendEvent;
+import com.sanya.events.system.SystemMessageEvent;
 
 import javax.swing.*;
 
@@ -91,7 +93,7 @@ public class ChatClientController {
 
         new Thread(() -> {
             try {
-                com.sanya.client.files.FileSender.sendFile(
+                FileSender.sendFile(
                         file,
                         context.getUserSettings().getName(),
                         context.services().chat()::sendObject,
@@ -99,7 +101,7 @@ public class ChatClientController {
                 );
             } catch (Exception ex) {
                 context.getEventBus().publish(
-                        new com.sanya.events.SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())
+                        new SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())
                 );
             }
         }, "FileSenderThread").start();

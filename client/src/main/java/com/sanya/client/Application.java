@@ -5,9 +5,9 @@ import com.sanya.client.core.EventSubscriptionsManager;
 import com.sanya.client.net.ChatConnector;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.ui.ChatClientUI;
-import com.sanya.client.ui.UIFacade;
-import com.sanya.client.ui.swing.SwingUIFacade;
-import com.sanya.events.ConnectionLostEvent;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.client.facade.swing.SwingUIFacade;
+import com.sanya.events.system.ConnectionLostEvent;
 
 import javax.swing.*;
 

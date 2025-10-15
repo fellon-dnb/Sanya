@@ -1,11 +1,9 @@
 package com.sanya.client.service.audio;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.client.audio.VoicePlayer;
-import com.sanya.client.audio.VoiceRecorder;
-import com.sanya.events.SystemMessageEvent;
-import com.sanya.events.VoiceMessageReadyEvent;
-import com.sanya.events.VoiceRecordingEvent;
+import com.sanya.events.system.SystemMessageEvent;
+import com.sanya.events.voice.VoiceMessageReadyEvent;
+import com.sanya.events.voice.VoiceRecordingEvent;
 
 public class VoiceService {
 

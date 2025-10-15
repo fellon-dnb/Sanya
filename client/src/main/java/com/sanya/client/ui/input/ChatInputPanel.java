@@ -2,7 +2,9 @@ package com.sanya.client.ui.input;
 
 import com.sanya.client.ApplicationContext;
 import com.sanya.client.service.audio.VoiceService;
-import com.sanya.events.MessageSendEvent;
+import com.sanya.client.service.files.FileSender;
+import com.sanya.events.chat.MessageSendEvent;
+import com.sanya.events.system.SystemMessageEvent;
 
 import javax.swing.*;
 import java.awt.*;
@@ -78,7 +80,7 @@ public class ChatInputPanel extends JPanel {
 
         new Thread(() -> {
             try {
-                com.sanya.client.files.FileSender.sendFile(
+                FileSender.sendFile(
                         chosen,
                         ctx.getUserSettings().getName(),
                         ctx.services().chat()::sendObject,
@@ -86,7 +88,7 @@ public class ChatInputPanel extends JPanel {
                 );
             } catch (Exception ex) {
                 ctx.getEventBus().publish(
-                        new com.sanya.events.SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())
+                        new SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())
                 );
             }
         }, "FileSenderThread").start();

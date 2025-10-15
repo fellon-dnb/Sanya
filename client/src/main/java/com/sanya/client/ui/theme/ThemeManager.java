@@ -1,9 +1,9 @@
 package com.sanya.client.ui.theme;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.events.EventBus;
-import com.sanya.events.Theme;
-import com.sanya.events.ThemeChangedEvent;
+import com.sanya.events.core.EventBus;
+import com.sanya.events.system.Theme;
+import com.sanya.events.system.ThemeChangedEvent;
 
 /**
  * Менеджер темы — централизованное управление активной темой приложения.

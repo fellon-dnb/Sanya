@@ -1,18 +1,18 @@
 package com.sanya.client;
 
-import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.core.CommandHandler;
 import com.sanya.client.core.AppCore;
 import com.sanya.client.core.EventSubscriptionsManager;
 import com.sanya.client.core.ServiceRegistry;
-import com.sanya.client.di.DependencyContainer;
+import com.sanya.client.core.DependencyContainer;
 import com.sanya.client.service.ChatService;
 import com.sanya.client.service.audio.VoiceService;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.settings.UiSettings;
 import com.sanya.client.settings.UserSettings;
-import com.sanya.client.ui.UIFacade;
-import com.sanya.events.EventBus;
-import com.sanya.events.SimpleEventBus;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.events.core.EventBus;
+import com.sanya.events.core.SimpleEventBus;
 
 public final class ApplicationContext {
 

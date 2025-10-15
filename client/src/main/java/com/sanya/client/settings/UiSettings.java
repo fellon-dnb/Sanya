@@ -1,6 +1,6 @@
 package com.sanya.client.settings;
 
-import com.sanya.events.Theme;
+import com.sanya.events.system.Theme;
 
 public class UiSettings {
 
