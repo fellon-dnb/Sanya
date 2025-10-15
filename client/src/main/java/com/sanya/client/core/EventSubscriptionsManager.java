@@ -23,13 +23,14 @@ import com.sanya.files.FileTransferEvent;
 import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Централизованный менеджер подписок на события.
  * Управляет всеми подписками в приложении, что упрощает отладку и предотвращает утечки памяти.
  */
 public class EventSubscriptionsManager {
-
+    private static final Logger log = Logger.getLogger(EventSubscriptionsManager.class.getName());
     private final ApplicationContext context;
     private final UIFacade ui;
     private final ChatConnector connector;
@@ -48,14 +49,14 @@ public class EventSubscriptionsManager {
      * Регистрирует все подписки приложения
      */
     public void registerAllSubscriptions() {
-        System.out.println("[SubMgr] Registering voice subscriptions, total so far: " + subscriptions.size());
+        log.info("Registering voice subscriptions, total so far: " + subscriptions.size());
         registerMessageSubscriptions();
         registerUserListSubscriptions();
         registerVoiceSubscriptions();
         registerFileTransferSubscriptions();
         registerThemeSubscriptions();
 
-        System.out.println("[EventSubscriptions] Registered " + subscriptions.size() + " event subscriptions");
+        log.info("Registered " + subscriptions.size() + " event subscriptions");
     }
 
     /**
@@ -64,7 +65,7 @@ public class EventSubscriptionsManager {
     public void unsubscribeAll() {
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();
-        System.out.println("[EventSubscriptions] Unsubscribed all events");
+        log.info("Unsubscribed all events");
     }
 
     private void registerMessageSubscriptions() {
@@ -97,7 +98,7 @@ public class EventSubscriptionsManager {
                 SwingUtilities.invokeLater(() -> ui.updateUserList(e.usernames())));
 
         subscribe(UserDisconnectedEvent.class, e ->
-                System.out.println("[Event] User disconnected: " + e.username()));
+                log.info("User disconnected: " + e.username()));
     }
 
     private void registerVoiceSubscriptions() {
@@ -142,7 +143,7 @@ public class EventSubscriptionsManager {
         });
 
         subscribe(FileIncomingEvent.class, e ->
-                System.out.println("[Event] File incoming: " + e.request()));
+                log.info("File incoming: " + e.request()));
     }
 
     private void registerThemeSubscriptions() {
@@ -180,7 +181,7 @@ public class EventSubscriptionsManager {
     private void updateVoiceLevel(double level) {
         // Эта логика может быть перенесена в UI, оставляем здесь для примера
         int percent = (int) (level * 100);
-        System.out.println("[Voice] Recording level: " + percent + "%");
+        log.fine("Voice recording level: " + percent + "%");
     }
 
     /**
