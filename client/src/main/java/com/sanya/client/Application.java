@@ -97,12 +97,16 @@ public class Application {
 
     public static void main(String[] args) {
         // === Настройка логгера ===
-        try (InputStream input = Application.class.getResourceAsStream("/logging.properties")) {
-            if (input != null) {
-                LogManager.getLogManager().readConfiguration(input);
-                log.info("Logging configuration loaded successfully");
-            } else {
-                System.err.println("[WARN] logging.properties not found in resources");
+        try {
+            java.nio.file.Files.createDirectories(java.nio.file.Path.of("logs"));
+
+            try (InputStream input = Application.class.getResourceAsStream("/logging.properties")) {
+                if (input != null) {
+                    LogManager.getLogManager().readConfiguration(input);
+                    log.info("Logging configuration loaded successfully");
+                } else {
+                    System.err.println("[WARN] logging.properties not found in resources");
+                }
             }
         } catch (Exception e) {
             System.err.println("[WARN] Failed to initialize logging: " + e.getMessage());
@@ -113,8 +117,9 @@ public class Application {
             new Application().start(Arguments.parse(args));
         } catch (Exception e) {
             log.severe("Fatal error starting application: " + e.getMessage());
-            e.printStackTrace(); // опционально можно убрать, если все пишем в лог
+            log.log(Level.SEVERE, "Stack trace:", e);
             System.exit(1);
         }
     }
+
 }
