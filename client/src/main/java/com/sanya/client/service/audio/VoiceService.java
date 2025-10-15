@@ -12,62 +12,76 @@ public class VoiceService {
     private final ApplicationContext ctx;
     private VoiceRecorder recorder;
     private boolean recording;
-    private boolean sending; // Флаг для предотвращения множественной отправки
+    private boolean sending; // защита от множественной отправки
 
     public VoiceService(ApplicationContext ctx) {
         this.ctx = ctx;
     }
 
+    /** Запустить запись, если она не активна */
     public void startRecording() {
         if (recording) return;
+
         recording = true;
-        sending = false; // Сбрасываем флаг отправки
-        recorder = new VoiceRecorder(ctx);
-        ctx.getEventBus().publish(new VoiceRecordingEvent(ctx.getUserSettings().getName(), true));
-        new Thread(recorder, "VoiceRecorder").start();
+        sending = false; // сбрасываем флаг отправки
+
+        // Проверяем, есть ли активный рекордер
+        if (recorder == null || !recorder.isRunning()) {
+            recorder = new VoiceRecorder(ctx);
+            recorder.start();
+        }
+
+        ctx.getEventBus().publish(
+                new VoiceRecordingEvent(ctx.getUserSettings().getName(), true)
+        );
     }
 
+    /** Остановить запись */
     public void stopRecording() {
         if (!recording) return;
         recording = false;
+
         if (recorder != null) {
             recorder.stop();
         }
-        ctx.getEventBus().publish(new VoiceRecordingEvent(ctx.getUserSettings().getName(), false));
+
+        ctx.getEventBus().publish(
+                new VoiceRecordingEvent(ctx.getUserSettings().getName(), false)
+        );
     }
 
+    /** Воспроизвести временную запись (локально) */
     public void playTemp(byte[] data) {
-        new Thread(() -> new VoicePlayer(data).play()).start();
+        new Thread(() -> new VoicePlayer(data).play(), "VoicePlayerTemp").start();
     }
 
+    /** Отправить голосовое сообщение на сервер */
     public void sendVoice(byte[] data) {
-        // Защита от множественной отправки
-        if (sending) {
-            return;
-        }
+        if (sending) return; // защита от повторной отправки
         sending = true;
 
         try {
             var username = ctx.getUserSettings().getName();
-
-            // Только отправка на сервер, без локальных событий
             var out = ctx.services().chat().getOutputStream();
+
             synchronized (out) {
                 out.writeObject(new VoiceMessageReadyEvent(username, data));
                 out.flush();
             }
         } catch (Exception e) {
-            ctx.getEventBus().publish(new SystemMessageEvent("[ERROR] Отправка голосового сообщения: " + e.getMessage()));
+            ctx.getEventBus().publish(
+                    new SystemMessageEvent("[ERROR] Отправка голосового сообщения: " + e.getMessage())
+            );
         } finally {
-            // Сбрасываем флаг после небольшой задержки
+            // Сбрасываем флаг через 1 секунду
             new Thread(() -> {
                 try {
-                    Thread.sleep(1000); // Задержка 1 секунда
+                    Thread.sleep(1000);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                 }
                 sending = false;
-            }).start();
+            }, "VoiceSendReset").start();
         }
     }
 
