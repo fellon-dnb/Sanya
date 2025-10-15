@@ -8,12 +8,16 @@ import com.sanya.files.FileTransferRequest;
 import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Сетевой коннектор для обмена данными с сервером чата.
  * Отвечает только за сетевую коммуникацию, без бизнес-логики подписок.
  */
-public class ChatClientConnector {
+public class ChatClientConnector implements AutoCloseable {
+
+    private static final Logger log = Logger.getLogger(ChatClientConnector.class.getName());
 
     private final String host;
     private final int port;
@@ -32,141 +36,105 @@ public class ChatClientConnector {
         this.port = port;
         this.username = username;
         this.eventBus = eventBus;
-
-        // УДАЛЕНО: Подписка на MessageSendEvent - теперь это в EventSubscriptionsManager
-        // eventBus.subscribe(MessageSendEvent.class, e -> safeSendMessage(e.text()));
-
-        System.out.println("[ChatClientConnector] Connector created for user: " + username);
+        log.info(() -> "[ChatClientConnector] Connector created for user: " + username);
     }
 
-    /**
-     * Подключение к серверу
-     */
+    /** Подключение к серверу */
     public void connect() {
         if (connecting.get() || connected.get()) {
-            System.out.println("[ChatClientConnector] Already connected or connecting");
+            log.warning("[ChatClientConnector] Already connected or connecting");
             return;
         }
 
         connecting.set(true);
 
         try {
-            System.out.println("[ChatClientConnector] Connecting to " + host + ":" + port);
-
+            log.info(() -> "[ChatClientConnector] Connecting to " + host + ":" + port);
             socket = new Socket(host, port);
-            socket.setSoTimeout(30000); // 30 секунд таймаут
+            socket.setSoTimeout(30000);
 
             out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
-            in  = new ObjectInputStream(socket.getInputStream());
+            in = new ObjectInputStream(socket.getInputStream());
 
             connected.set(true);
             connecting.set(false);
 
-            // Отправляем приветственное сообщение
             out.writeObject(new Message(username, "<<<HELLO>>>"));
             out.flush();
 
-            // Запускаем поток чтения
             readerThread = new Thread(this::listenLoop, "ChatClientReader-" + username);
             readerThread.setDaemon(true);
             readerThread.start();
 
-            System.out.println("[ChatClientConnector] Successfully connected to server");
+            log.info("[ChatClientConnector] Successfully connected to server");
 
         } catch (IOException e) {
-            connecting.set(false);
-            connected.set(false);
-
-            String errorMsg = "Connection failed: " + e.getMessage();
-            System.err.println("[ChatClientConnector] " + errorMsg);
-
-            eventBus.publish(new MessageReceivedEvent(
-                    new Message("SYSTEM", errorMsg, Message.Type.SYSTEM)
-            ));
-            close();
+            handleConnectionError("Connection failed", e);
         } catch (Exception e) {
-            connecting.set(false);
-            connected.set(false);
-
-            String errorMsg = "Unexpected connection error: " + e.getMessage();
-            System.err.println("[ChatClientConnector] " + errorMsg);
-
-            eventBus.publish(new MessageReceivedEvent(
-                    new Message("SYSTEM", errorMsg, Message.Type.SYSTEM)
-            ));
-            close();
+            handleConnectionError("Unexpected connection error", e);
         }
     }
 
-    /**
-     * Основной цикл чтения данных от сервера
-     */
-    private void listenLoop() {
-        System.out.println("[ChatClientConnector] Starting listen loop");
+    private void handleConnectionError(String prefix, Exception e) {
+        connecting.set(false);
+        connected.set(false);
+        String errorMsg = prefix + ": " + e.getMessage();
+        log.log(Level.SEVERE, "[ChatClientConnector] " + errorMsg, e);
+        eventBus.publish(new MessageReceivedEvent(
+                new Message("SYSTEM", errorMsg, Message.Type.SYSTEM)
+        ));
+        close();
+    }
 
+    /** Основной цикл чтения данных от сервера */
+    private void listenLoop() {
+        log.info("[ChatClientConnector] Starting listen loop");
         try {
             while (connected.get() && !socket.isClosed()) {
                 Object obj = in.readObject();
                 processIncomingObject(obj);
             }
         } catch (EOFException e) {
-            System.out.println("[ChatClientConnector] Server closed connection (EOF)");
+            log.info("[ChatClientConnector] Server closed connection (EOF)");
         } catch (StreamCorruptedException e) {
-            System.out.println("[ChatClientConnector] Stream corrupted, disconnecting");
+            log.warning("[ChatClientConnector] Stream corrupted, disconnecting");
         } catch (IOException e) {
-            if (connected.get()) {
-                System.err.println("[ChatClientConnector] Read error: " + e.getMessage());
-            }
+            if (connected.get()) log.log(Level.WARNING, "[ChatClientConnector] Read error", e);
         } catch (ClassNotFoundException e) {
-            System.err.println("[ChatClientConnector] Unknown object received: " + e.getMessage());
+            log.log(Level.SEVERE, "[ChatClientConnector] Unknown object received", e);
         } catch (Exception e) {
-            System.err.println("[ChatClientConnector] Unexpected error in listen loop: " + e.getMessage());
-            e.printStackTrace();
+            log.log(Level.SEVERE, "[ChatClientConnector] Unexpected error in listen loop", e);
         } finally {
-            System.out.println("[ChatClientConnector] Listen loop ended");
+            log.info("[ChatClientConnector] Listen loop ended");
             handleDisconnection();
         }
     }
 
-    /**
-     * Обработка входящих объектов от сервера
-     */
+    /** Обработка входящих объектов от сервера */
     private void processIncomingObject(Object obj) {
         try {
             if (obj instanceof Message msg) {
                 eventBus.publish(new MessageReceivedEvent(msg));
-
             } else if (obj instanceof UserListUpdatedEvent list) {
                 eventBus.publish(list);
-
             } else if (obj instanceof FileTransferRequest req) {
                 eventBus.publish(new FileIncomingEvent(req, in));
-
             } else if (obj instanceof FileChunk chunk) {
-                if (!"voice".equals(chunk.getFilename())) {
+                if (!"voice".equals(chunk.getFilename()))
                     eventBus.publish(new FileChunkEvent(chunk));
-                }
-
             } else if (obj instanceof VoiceMessageReadyEvent evt) {
-                // ВАЖНО: НЕ фильтруем по username - сервер уже это сделал
-                // EventSubscriptionsManager позаботится о фильтрации если нужно
                 eventBus.publish(evt);
-
             } else {
-                System.out.println("[ChatClientConnector] Unknown object type: " + obj.getClass().getSimpleName());
+                log.warning(() -> "[ChatClientConnector] Unknown object type: " + obj.getClass().getSimpleName());
             }
-
         } catch (Exception e) {
-            System.err.println("[ChatClientConnector] Error processing incoming object: " + e.getMessage());
+            log.log(Level.SEVERE, "[ChatClientConnector] Error processing incoming object", e);
             eventBus.publish(new SystemMessageEvent("Error processing server data: " + e.getMessage()));
         }
     }
 
-    /**
-     * Безопасная отправка текстового сообщения
-     * Теперь public для доступа из EventSubscriptionsManager
-     */
+    /** Безопасная отправка текстового сообщения */
     public void safeSendMessage(String text) {
         if (!connected.get() || out == null) {
             eventBus.publish(new MessageReceivedEvent(
@@ -174,121 +142,83 @@ public class ChatClientConnector {
             ));
             return;
         }
-
         try {
             synchronized (out) {
                 out.writeObject(new Message(username, text));
                 out.flush();
             }
         } catch (IOException e) {
-            String errorMsg = "Send failed: " + e.getMessage();
-            System.err.println("[ChatClientConnector] " + errorMsg);
-
+            log.log(Level.WARNING, "[ChatClientConnector] Send failed", e);
             eventBus.publish(new MessageReceivedEvent(
-                    new Message("SYSTEM", errorMsg, Message.Type.SYSTEM)
+                    new Message("SYSTEM", "Send failed: " + e.getMessage(), Message.Type.SYSTEM)
             ));
-
-            // При ошибке отправки считаем что соединение разорвано
             handleDisconnection();
         }
     }
 
-    /**
-     * Безопасная отправка любого объекта
-     */
+    /** Безопасная отправка любого объекта */
     public void safeSendObject(Object obj) {
         if (!connected.get() || out == null) {
-            System.err.println("[ChatClientConnector] Cannot send object - not connected");
+            log.warning("[ChatClientConnector] Cannot send object - not connected");
             return;
         }
-
         try {
             synchronized (out) {
                 out.writeObject(obj);
                 out.flush();
             }
         } catch (IOException e) {
-            System.err.println("[ChatClientConnector] Failed to send object: " + e.getMessage());
+            log.log(Level.WARNING, "[ChatClientConnector] Failed to send object", e);
             handleDisconnection();
         }
     }
 
-    /**
-     * Обработка разрыва соединения
-     */
+    /** Обработка разрыва соединения */
     private void handleDisconnection() {
         if (connected.compareAndSet(true, false)) {
-            System.out.println("[ChatClientConnector] Handling disconnection");
-
+            log.info("[ChatClientConnector] Handling disconnection");
             eventBus.publish(new UserDisconnectedEvent(username));
             eventBus.publish(new MessageReceivedEvent(
                     new Message("SYSTEM", "Disconnected from server", Message.Type.SYSTEM)
             ));
-
             close();
         }
     }
 
-    /**
-     * Получение выходного потока (для отправки файлов и голосовых сообщений)
-     */
+    /** Получение выходного потока (для отправки файлов и голосовых сообщений) */
     public ObjectOutputStream getOutputStream() {
         return out;
     }
 
-    /**
-     * Проверка подключения
-     */
+    /** Проверка подключения */
     public boolean isConnected() {
         return connected.get() && socket != null && !socket.isClosed();
     }
 
-    /**
-     * Закрытие соединения и очистка ресурсов
-     */
+    /** Закрытие соединения и очистка ресурсов */
+    @Override
     public void close() {
-        System.out.println("[ChatClientConnector] Closing connection");
-
+        log.info("[ChatClientConnector] Closing connection");
         connected.set(false);
         connecting.set(false);
 
-        // Останавливаем поток чтения
-        if (readerThread != null && readerThread.isAlive()) {
+        if (readerThread != null && readerThread.isAlive())
             readerThread.interrupt();
-        }
 
-        // Закрываем потоки
-        if (out != null) {
-            try {
-                out.close();
-            } catch (IOException ignored) {}
-            out = null;
-        }
+        try {
+            if (out != null) out.close();
+        } catch (IOException ignored) {}
+        try {
+            if (in != null) in.close();
+        } catch (IOException ignored) {}
+        try {
+            if (socket != null && !socket.isClosed()) socket.close();
+        } catch (IOException ignored) {}
 
-        if (in != null) {
-            try {
-                in.close();
-            } catch (IOException ignored) {}
-            in = null;
-        }
+        out = null;
+        in = null;
+        socket = null;
 
-        // Закрываем сокет
-        if (socket != null && !socket.isClosed()) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {}
-            socket = null;
-        }
-
-        System.out.println("[ChatClientConnector] Connection closed");
-    }
-
-    /**
-     * Деструктор для дополнительной безопасности
-     */
-    @Override
-    protected void finalize() throws Throwable {
-        close();
-        super.finalize();
+        log.info("[ChatClientConnector] Connection closed");
     }
 }

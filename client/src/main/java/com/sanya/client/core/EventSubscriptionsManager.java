@@ -35,6 +35,7 @@ public class EventSubscriptionsManager {
      * Регистрирует все подписки приложения
      */
     public void registerAllSubscriptions() {
+        System.out.println("[SubMgr] Registering voice subscriptions, total so far: " + subscriptions.size());
         registerMessageSubscriptions();
         registerUserListSubscriptions();
         registerVoiceSubscriptions();
