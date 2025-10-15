@@ -1,6 +1,7 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.client.core.EventSubscriptionsManager;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.ui.ChatClientUI;
 import com.sanya.client.ui.UIFacade;
@@ -27,43 +28,79 @@ public class Application {
         ApplicationContext ctx = new ApplicationContext(networkSettings);
 
         SwingUtilities.invokeLater(() -> {
-            // === Ввод имени ===
-            String username = usernameFromCli.isEmpty()
-                    ? JOptionPane.showInputDialog("Enter your Name:")
-                    : usernameFromCli;
+            try {
+                // === Ввод имени ===
+                String username = usernameFromCli.isEmpty()
+                        ? JOptionPane.showInputDialog("Enter your Name:")
+                        : usernameFromCli;
 
-            if (username == null || username.isBlank()) username = "Anonymous";
-            ctx.getUserSettings().setName(username);
+                if (username == null || username.isBlank()) username = "Anonymous";
+                ctx.getUserSettings().setName(username);
 
-            // === Создание UI ===
-            ChatClientUI ui = new ChatClientUI(ctx);
+                // === Создание UI ===
+                ChatClientUI ui = new ChatClientUI(ctx);
 
-            // === Инициализация фасада ===
-            UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
-            ctx.setUIFacade(facade);
+                // === Инициализация фасада ===
+                UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
+                ctx.setUIFacade(facade);
 
-            // === Контроллер (события UI ↔ логика) ===
-            new ChatClientController(ctx);
+                // === Сетевое подключение ===
+                ChatClientConnector connector = new ChatClientConnector(
+                        networkSettings.getHost(),
+                        networkSettings.getPort(),
+                        ctx.getUserSettings().getName(),
+                        ctx.getEventBus()
+                );
 
-            // === Сетевое подключение ===
-            ChatClientConnector connector = new ChatClientConnector(
-                    networkSettings.getHost(),
-                    networkSettings.getPort(),
-                    ctx.getUserSettings().getName(),
-                    ctx.getEventBus()
-            );
+                // Привязка коннектора к ChatService
+                ctx.services().chat().attachConnector(connector);
 
-            // Привязка коннектора к ChatService
-            ctx.services().chat().attachConnector(connector);
+                // === Инициализация менеджера подписок ===
+                EventSubscriptionsManager subscriptionsManager =
+                        new EventSubscriptionsManager(ctx, facade, connector);
+                ctx.setEventSubscriptionsManager(subscriptionsManager);
 
-            connector.connect();
+                // Регистрация всех подписок
+                subscriptionsManager.registerAllSubscriptions();
 
-            // === Запуск UI ===
-            ui.setVisible(true);
+                // === Упрощенный контроллер ===
+                new ChatClientController(ctx);
+
+                // === Подключение к серверу ===
+                connector.connect();
+
+                // === Запуск UI ===
+                ui.setVisible(true);
+
+                // === Shutdown hook для cleanup ===
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    System.out.println("[Application] Shutdown hook executed");
+                    if (ctx.getEventSubscriptionsManager() != null) {
+                        ctx.getEventSubscriptionsManager().unsubscribeAll();
+                    }
+                    if (connector != null) {
+                        connector.close();
+                    }
+                }));
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(null,
+                        "Failed to start application: " + e.getMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
+                System.exit(1);
+            }
         });
     }
 
     public static void main(String[] args) {
-        new Application().start(Arguments.parse(args));
+        try {
+            new Application().start(Arguments.parse(args));
+        } catch (Exception e) {
+            System.err.println("Fatal error starting application: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 }
