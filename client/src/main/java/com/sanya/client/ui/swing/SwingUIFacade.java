@@ -2,55 +2,60 @@ package com.sanya.client.ui.swing;
 
 import com.sanya.client.ApplicationContext;
 import com.sanya.client.ui.UIFacade;
-import com.sanya.client.ChatClientUI;
+import com.sanya.client.ui.main.ChatMainPanel;
 import com.sanya.client.ui.NotificationManager;
 import com.sanya.events.SystemMessageEvent;
+import com.sanya.events.Theme;
 
 import javax.swing.*;
 import java.io.File;
 import java.util.List;
 
+/**
+ * Swing-реализация фасада для UI.
+ * Работает с ChatMainPanel вместо ChatClientUI.
+ */
 public class SwingUIFacade implements UIFacade {
 
-    private final ChatClientUI ui;
     private final ApplicationContext ctx;
-    public SwingUIFacade(ChatClientUI ui, ApplicationContext ctx) {
-        this.ui = ui;
-        this.ctx = ctx;
+    private final ChatMainPanel mainPanel;
 
-        ctx.getEventBus().subscribe(SystemMessageEvent.class, e ->
-                NotificationManager.showError(e.message())
-        );
+    public SwingUIFacade(ApplicationContext ctx, ChatMainPanel mainPanel) {
+        this.ctx = ctx;
+        this.mainPanel = mainPanel;
+
+        ctx.getEventBus().subscribe(SystemMessageEvent.class,
+                e -> NotificationManager.showError(e.message()));
     }
 
     @Override
     public void appendChatMessage(String text) {
-        ui.appendChatMessage(text); // заменено на публичный метод
+        mainPanel.appendChatMessage(text);
     }
 
     @Override
     public void appendSystemMessage(String text) {
-        ui.appendSystemMessage("[SYSTEM] " + text);
+        mainPanel.appendSystemMessage("[SYSTEM] " + text);
     }
 
     @Override
     public void clearChat() {
-        SwingUtilities.invokeLater(ui::clearChat);
+        SwingUtilities.invokeLater(mainPanel::clearChat);
     }
 
     @Override
     public void updateUserList(List<String> usernames) {
-        SwingUtilities.invokeLater(() -> ui.updateUserList(usernames));
+        SwingUtilities.invokeLater(() -> mainPanel.updateUserList(usernames));
     }
 
     @Override
     public void showFileTransferProgress(String filename, int percent, boolean outgoing) {
-        ui.updateFileTransferProgress(filename, percent, outgoing);
+        mainPanel.updateFileTransferProgress(filename, percent, outgoing);
     }
 
     @Override
     public void showFileTransferCompleted(String filename, boolean outgoing) {
-        ui.fileTransferCompleted(filename, outgoing);
+        mainPanel.fileTransferCompleted(filename, outgoing);
     }
 
     @Override
@@ -64,17 +69,17 @@ public class SwingUIFacade implements UIFacade {
 
     @Override
     public void showFileSaveDialog(String filename, byte[] data) {
-        // Реализовать позже
+        // пока не реализовано
     }
 
     @Override
     public void showVoiceMessage(String username, byte[] data) {
-        ui.addVoiceMessage(username, data);
+        mainPanel.addVoiceMessage(username, data);
     }
 
     @Override
     public void showVoiceRecordingStatus(boolean recording) {
-        ui.setRecordingIndicator(recording);
+        mainPanel.setRecordingIndicator(recording);
     }
 
     @Override
@@ -94,9 +99,8 @@ public class SwingUIFacade implements UIFacade {
 
     @Override
     public void applyTheme(Object theme) {
-        if (theme instanceof com.sanya.events.Theme t) {
-            ui.applyTheme(t);
+        if (theme instanceof Theme t) {
+            mainPanel.applyTheme(t);
         }
     }
-
 }

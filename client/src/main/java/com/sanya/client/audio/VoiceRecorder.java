@@ -1,15 +1,17 @@
 package com.sanya.client.audio;
 
 import com.sanya.client.ApplicationContext;
+import com.sanya.events.SystemMessageEvent;
 import com.sanya.events.VoiceLevelEvent;
 import com.sanya.events.VoiceRecordingStoppedEvent;
 
 import javax.sound.sampled.*;
 import java.io.ByteArrayOutputStream;
+
 import static com.sanya.client.audio.AudioConfig.getFormat;
 
 /**
- * Записывает голос, публикует громкость (VU meter) и событие об окончании записи.
+ * Захват звука с микрофона, публикация уровня сигнала (VU meter) и события об окончании записи.
  */
 public class VoiceRecorder implements Runnable {
 
@@ -28,6 +30,12 @@ public class VoiceRecorder implements Runnable {
     public void run() {
         AudioFormat format = getFormat();
         DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
+        if (!AudioSystem.isLineSupported(info)) {
+            ctx.getEventBus().publish(new SystemMessageEvent(
+                    "[ERROR] Аудио вход не поддерживается: " + format.toString()));
+            return;
+        }
 
         try (TargetDataLine mic = (TargetDataLine) AudioSystem.getLine(info);
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -53,25 +61,26 @@ public class VoiceRecorder implements Runnable {
             }
 
             mic.stop();
-            mic.close();
 
             byte[] audio = baos.toByteArray();
             ctx.getEventBus().publish(
                     new VoiceRecordingStoppedEvent(ctx.getUserSettings().getName(), audio)
             );
 
+        } catch (LineUnavailableException e) {
+            ctx.getEventBus().publish(new SystemMessageEvent("[ERROR] Микрофон недоступен: " + e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
+            ctx.getEventBus().publish(new SystemMessageEvent("[ERROR] Ошибка записи звука: " + e.getMessage()));
         }
     }
 
     private double calcRMS(byte[] data, int len) {
         long sum = 0;
         for (int i = 0; i < len; i += 2) {
-            short sample = (short) ((data[i + 1] << 8) | (data[i] & 0xff));
+            short sample = (short) ((data[i + 1] << 8) | (data[i] & 0xFF));
             sum += sample * sample;
         }
         double mean = sum / (len / 2.0);
-        return Math.sqrt(mean) / 32768.0; // нормализуем 0..1
+        return Math.sqrt(mean) / 32768.0;
     }
 }

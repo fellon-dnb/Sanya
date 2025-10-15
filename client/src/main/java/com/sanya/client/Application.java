@@ -2,6 +2,7 @@ package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
 import com.sanya.client.settings.NetworkSettings;
+import com.sanya.client.ui.ChatClientUI;
 import com.sanya.client.ui.UIFacade;
 import com.sanya.client.ui.swing.SwingUIFacade;
 
@@ -38,7 +39,7 @@ public class Application {
             ChatClientUI ui = new ChatClientUI(ctx);
 
             // === Инициализация фасада ===
-            UIFacade facade = new SwingUIFacade(ui, ctx);
+            UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
             ctx.setUIFacade(facade);
 
             // === Контроллер (события UI ↔ логика) ===
