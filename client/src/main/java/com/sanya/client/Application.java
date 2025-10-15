@@ -49,7 +49,10 @@ public class Application {
                         ctx.getEventBus()
                 );
 
-                // Временно — напрямую передаём connector в ChatService через ObjectOutputStream
+// Регистрация коннектора в DI-контейнере
+                ctx.di().registerSingleton(ChatConnector.class, () -> connector);
+
+// Передаём ChatService логику отправки
                 ctx.services().chat().attachOutputSupplier(connector::isConnected, connector::sendObject);
 
                 // === Подписки ===
