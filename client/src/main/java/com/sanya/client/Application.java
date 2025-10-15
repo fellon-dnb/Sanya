@@ -1,10 +1,13 @@
 package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
+import com.sanya.client.core.EventSubscriptionsManager;
+import com.sanya.client.net.ChatConnector;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.ui.ChatClientUI;
-import com.sanya.client.ui.UIFacade;
-import com.sanya.client.ui.swing.SwingUIFacade;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.client.facade.swing.SwingUIFacade;
+import com.sanya.events.system.ConnectionLostEvent;
 
 import javax.swing.*;
 
@@ -15,7 +18,6 @@ import javax.swing.*;
 public class Application {
 
     public void start(Arguments args) {
-        // === Чтение аргументов ===
         NetworkSettings networkSettings = new NetworkSettings(
                 args.get(String.class, new String[]{"--host", "-h"}, "localhost"),
                 args.get(Integer.class, new String[]{"--port", "-p"}, 12345)
@@ -23,47 +25,78 @@ public class Application {
 
         String usernameFromCli = args.get(String.class, new String[]{"--username", "-u"}, "");
 
-        // === Создание контекста ===
         ApplicationContext ctx = new ApplicationContext(networkSettings);
 
         SwingUtilities.invokeLater(() -> {
-            // === Ввод имени ===
-            String username = usernameFromCli.isEmpty()
-                    ? JOptionPane.showInputDialog("Enter your Name:")
-                    : usernameFromCli;
+            try {
+                String username = usernameFromCli.isEmpty()
+                        ? JOptionPane.showInputDialog("Enter your Name:")
+                        : usernameFromCli;
 
-            if (username == null || username.isBlank()) username = "Anonymous";
-            ctx.getUserSettings().setName(username);
+                if (username == null || username.isBlank()) username = "Anonymous";
+                ctx.getUserSettings().setName(username);
 
-            // === Создание UI ===
-            ChatClientUI ui = new ChatClientUI(ctx);
+                ChatClientUI ui = new ChatClientUI(ctx);
 
-            // === Инициализация фасада ===
-            UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
-            ctx.setUIFacade(facade);
+                UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
+                ctx.setUIFacade(facade);
 
-            // === Контроллер (события UI ↔ логика) ===
-            new ChatClientController(ctx);
+                // === Новый ChatConnector ===
+                ChatConnector connector = new ChatConnector(
+                        networkSettings.getHost(),
+                        networkSettings.getPort(),
+                        ctx.getUserSettings().getName(),
+                        ctx.getEventBus()
+                );
 
-            // === Сетевое подключение ===
-            ChatClientConnector connector = new ChatClientConnector(
-                    networkSettings.getHost(),
-                    networkSettings.getPort(),
-                    ctx.getUserSettings().getName(),
-                    ctx.getEventBus()
-            );
+// Регистрация коннектора в DI-контейнере
+                ctx.di().registerSingleton(ChatConnector.class, () -> connector);
 
-            // Привязка коннектора к ChatService
-            ctx.services().chat().attachConnector(connector);
+// Передаём ChatService логику отправки
+                ctx.services().chat().attachOutputSupplier(connector::isConnected, connector::sendObject);
 
-            connector.connect();
+                // === Подписки ===
+                EventSubscriptionsManager subscriptionsManager =
+                        new EventSubscriptionsManager(ctx, facade, connector);
+                ctx.setEventSubscriptionsManager(subscriptionsManager);
+                subscriptionsManager.registerAllSubscriptions();
 
-            // === Запуск UI ===
-            ui.setVisible(true);
+                // === Подписка на потерю соединения ===
+                ctx.getEventBus().subscribe(ConnectionLostEvent.class, e ->
+                        ctx.getUIFacade().showWarning("[NETWORK] " + e.reason() +
+                                (e.willReconnect() ? " (reconnecting...)" : "")));
+
+                new ChatClientController(ctx);
+
+                connector.connect();
+                ui.setVisible(true);
+
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    System.out.println("[Application] Shutdown hook executed");
+                    if (ctx.getEventSubscriptionsManager() != null) {
+                        ctx.getEventSubscriptionsManager().unsubscribeAll();
+                    }
+                    connector.close();
+                }));
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(null,
+                        "Failed to start application: " + e.getMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
+                System.exit(1);
+            }
         });
     }
 
     public static void main(String[] args) {
-        new Application().start(Arguments.parse(args));
+        try {
+            new Application().start(Arguments.parse(args));
+        } catch (Exception e) {
+            System.err.println("Fatal error starting application: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 }

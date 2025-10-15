@@ -3,8 +3,9 @@ package com.sanya.client.ui;
 import com.sanya.client.ApplicationContext;
 import com.sanya.client.ChatClientController;
 import com.sanya.client.core.AppCore;
+import com.sanya.client.facade.UIFacade;
 import com.sanya.client.ui.main.ChatMainPanel;
-import com.sanya.client.ui.swing.SwingUIFacade;
+import com.sanya.client.facade.swing.SwingUIFacade;
 
 import javax.swing.*;
 

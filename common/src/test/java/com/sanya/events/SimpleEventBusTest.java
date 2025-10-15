@@ -1,6 +1,11 @@
 package com.sanya.events;
 
 import com.sanya.Message;
+import com.sanya.events.chat.MessageEvent;
+import com.sanya.events.chat.MessageReceivedEvent;
+import com.sanya.events.chat.MessageSendEvent;
+import com.sanya.events.core.EventBus;
+import com.sanya.events.core.SimpleEventBus;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;

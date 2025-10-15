@@ -2,10 +2,10 @@ package com.sanya.client.ui.main;
 
 import com.sanya.client.ApplicationContext;
 import com.sanya.client.ui.NotificationManager;
-import com.sanya.client.ui.dialog.ChatVoiceDialog;
 import com.sanya.client.service.audio.VoiceService;
-import com.sanya.events.Theme;
-import com.sanya.events.ThemeChangedEvent;
+import com.sanya.events.system.Theme;
+import com.sanya.events.system.ThemeChangedEvent;
+import com.sanya.events.voice.VoiceLevelEvent;
 
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
@@ -54,7 +54,7 @@ public class ChatMainPanel extends JPanel {
                 SwingUtilities.invokeLater(() -> applyTheme(e.theme())));
 
         // === Подписка на уровень громкости записи ===
-        ctx.getEventBus().subscribe(com.sanya.events.VoiceLevelEvent.class,
+        ctx.getEventBus().subscribe(VoiceLevelEvent.class,
                 e -> SwingUtilities.invokeLater(() -> updateRecordingLevel(e.level())));
     }
 

@@ -1,102 +1,125 @@
 package com.sanya.client;
 
-import com.sanya.client.ui.UIFacade;
-import com.sanya.client.ui.dialog.ChatVoiceDialog;
-import com.sanya.events.*;
-import com.sanya.files.FileTransferEvent;
+import com.sanya.client.service.files.FileSender;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.events.chat.MessageSendEvent;
+import com.sanya.events.system.SystemMessageEvent;
 
 import javax.swing.*;
 
 /**
- * Связывает EventBus и UI. Реагирует на события и вызывает нужные методы интерфейса.
+ * Упрощенный контроллер - основная логика подписок вынесена в EventSubscriptionsManager.
+ * Теперь отвечает только за специфичную UI логику и обработку команд.
  */
 public class ChatClientController {
 
     private final ApplicationContext context;
     private final UIFacade ui;
-    private ChatVoiceDialog currentVoiceDialog;
 
     public ChatClientController(ApplicationContext context) {
         this.context = context;
         this.ui = context.getUIFacade();
 
-        EventBus eventBus = context.getEventBus();
-        if (eventBus != null) {
-            subscribeToEvents(eventBus);
+        System.out.println("[ChatClientController] Controller initialized");
+        // Все подписки на события теперь управляются через EventSubscriptionsManager
+        // Этот класс может быть использован для UI-специфичной логики, не связанной с событиями
+    }
+
+    /**
+     * Отправка текстового сообщения
+     * Этот метод может вызываться из UI компонентов
+     */
+    public void sendMessage(String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+
+        try {
+            // Публикуем событие отправки сообщения
+            context.getEventBus().publish(new MessageSendEvent(text));
+
+            // Локально добавляем сообщение в чат (дублирование убрано в EventSubscriptionsManager)
+            // ui.appendChatMessage("Я: " + text);
+
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() ->
+                    ui.showError("Ошибка отправки сообщения: " + e.getMessage()));
         }
     }
 
-    private void subscribeToEvents(EventBus eventBus) {
-
-        eventBus.subscribe(MessageReceivedEvent.class, e -> {
-            String self = context.getUserSettings().getName();
-            if (e.message().getFrom().equals(self))
-                ui.appendChatMessage("Я: " + e.message().getText());
-            else
-                ui.appendChatMessage(e.message().toString());
-        });
-
-        eventBus.subscribe(UserListUpdatedEvent.class, e -> ui.updateUserList(e.usernames()));
-        eventBus.subscribe(ClearChatEvent.class, e -> ui.clearChat());
-
-        // Голосовые сообщения - только от других пользователей
-        eventBus.subscribe(VoiceMessageReadyEvent.class, e -> {
-            if (!e.username().equals(context.getUserSettings().getName())) {
-                SwingUtilities.invokeLater(() -> ui.showVoiceMessage(e.username(), e.data()));
-            }
-        });
-
-        // Диалог после остановки записи - только для текущего пользователя
-        eventBus.subscribe(VoiceRecordingStoppedEvent.class, e -> {
-            if (!e.username().equals(context.getUserSettings().getName())) {
-                return;
-            }
-
-            SwingUtilities.invokeLater(() -> {
-                // Закрываем предыдущий диалог, если есть
-                if (currentVoiceDialog != null && currentVoiceDialog.isVisible()) {
-                    currentVoiceDialog.dispose();
-                }
-
-                // Создаем новый диалог
-                currentVoiceDialog = new ChatVoiceDialog(
-                        null,
-                        e.data(),
-                        context.services().voice()
-                );
-
-                // Настраиваем слушатель закрытия
-                currentVoiceDialog.addWindowListener(new java.awt.event.WindowAdapter() {
-                    @Override
-                    public void windowClosed(java.awt.event.WindowEvent e) {
-                        currentVoiceDialog = null;
-                    }
-                });
-
-                currentVoiceDialog.setVisible(true);
-            });
-        });
-
-        eventBus.subscribe(FileTransferEvent.class, e -> {
-            switch (e.type()) {
-                case STARTED -> ui.showFileTransferProgress(e.filename(), 0, e.outgoing());
-                case PROGRESS -> {
-                    int percent = (int) ((100.0 * e.transferredBytes()) / e.totalBytes());
-                    ui.showFileTransferProgress(e.filename(), percent, e.outgoing());
-                }
-                case COMPLETED -> ui.showFileTransferCompleted(e.filename(), e.outgoing());
-                case FAILED -> ui.showError("Ошибка при передаче файла: " + e.errorMessage());
-            }
-        });
-
-        eventBus.subscribe(VoiceRecordingEvent.class, e ->
-                SwingUtilities.invokeLater(() ->
-                        ui.showVoiceRecordingStatus(e.started())));
+    /**
+     * Очистка чата
+     */
+    public void clearChat() {
+        try {
+            context.services().chat().clearChat();
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() ->
+                    ui.showError("Ошибка очистки чата: " + e.getMessage()));
+        }
     }
 
-    public void sendMessage(String text) {
-        if (text == null || text.isBlank()) return;
-        context.getEventBus().publish(new MessageSendEvent(text));
-        ui.appendChatMessage("Я: " + text);
+    /**
+     * Запуск записи голосового сообщения
+     */
+    public void startVoiceRecording() {
+        try {
+            context.services().voice().startRecording();
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() ->
+                    ui.showError("Ошибка начала записи: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Остановка записи голосового сообщения
+     */
+    public void stopVoiceRecording() {
+        try {
+            context.services().voice().stopRecording();
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() ->
+                    ui.showError("Ошибка остановки записи: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Отправка файла
+     */
+    public void sendFile(java.io.File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                FileSender.sendFile(
+                        file,
+                        context.getUserSettings().getName(),
+                        context.services().chat()::sendObject,
+                        context.getEventBus()
+                );
+            } catch (Exception ex) {
+                context.getEventBus().publish(
+                        new SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())
+                );
+            }
+        }, "FileSenderThread").start();
+    }
+
+    /**
+     * Выход из приложения
+     */
+    public void exitApplication() {
+        try {
+            if (context.getEventSubscriptionsManager() != null)
+                context.getEventSubscriptionsManager().unsubscribeAll();
+
+            System.out.println("[ChatClientController] Application exit requested");
+            System.exit(0);
+        } catch (Exception e) {
+            System.err.println("Error during application exit: " + e.getMessage());
+            System.exit(1);
+        }
     }
 }

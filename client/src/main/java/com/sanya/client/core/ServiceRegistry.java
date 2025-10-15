@@ -4,7 +4,7 @@ import com.sanya.client.ApplicationContext;
 import com.sanya.client.service.ChatService;
 import com.sanya.client.service.audio.VoiceService;
 import com.sanya.client.ui.theme.ThemeManager;
-import com.sanya.events.EventBus;
+import com.sanya.events.core.EventBus;
 
 /**
  * Реестр всех сервисов клиента (chat, voice и т.д.)

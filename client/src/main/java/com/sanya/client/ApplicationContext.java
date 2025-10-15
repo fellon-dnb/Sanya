@@ -1,17 +1,18 @@
 package com.sanya.client;
 
-import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.core.CommandHandler;
 import com.sanya.client.core.AppCore;
+import com.sanya.client.core.EventSubscriptionsManager;
 import com.sanya.client.core.ServiceRegistry;
-import com.sanya.client.di.DependencyContainer;
+import com.sanya.client.core.DependencyContainer;
 import com.sanya.client.service.ChatService;
 import com.sanya.client.service.audio.VoiceService;
 import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.settings.UiSettings;
 import com.sanya.client.settings.UserSettings;
-import com.sanya.client.ui.UIFacade;
-import com.sanya.events.EventBus;
-import com.sanya.events.SimpleEventBus;
+import com.sanya.client.facade.UIFacade;
+import com.sanya.events.core.EventBus;
+import com.sanya.events.core.SimpleEventBus;
 
 public final class ApplicationContext {
 
@@ -24,6 +25,7 @@ public final class ApplicationContext {
     private final CommandHandler commandHandler = new CommandHandler(this);
     private final AppCore core = new AppCore(this);
     private UIFacade uiFacade;
+    private EventSubscriptionsManager eventSubscriptionsManager;
 
     public ApplicationContext(NetworkSettings networkSettings) {
         this.networkSettings = networkSettings;
@@ -32,6 +34,7 @@ public final class ApplicationContext {
         di.registerSingleton(ApplicationContext.class, () -> this);
         di.registerSingleton(ChatService.class, () -> core.services().chat());
         di.registerSingleton(VoiceService.class, () -> core.services().voice());
+        di.registerSingleton(EventSubscriptionsManager.class, () -> eventSubscriptionsManager);
     }
 
     public <T> T get(Class<T> type) {
@@ -55,5 +58,12 @@ public final class ApplicationContext {
     public void setUIFacade(UIFacade uiFacade) {
         this.uiFacade = uiFacade;
         di.registerSingleton(UIFacade.class, () -> uiFacade);
+    }
+    public EventSubscriptionsManager getEventSubscriptionsManager() {
+        return eventSubscriptionsManager;
+    }
+
+    public void setEventSubscriptionsManager(EventSubscriptionsManager eventSubscriptionsManager) {
+        this.eventSubscriptionsManager = eventSubscriptionsManager;
     }
 }

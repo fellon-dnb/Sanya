@@ -1,9 +1,7 @@
 package com.sanya.client.core;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.client.di.DependencyContainer;
-import com.sanya.events.EventBus;
-import com.sanya.events.SimpleEventBus;
+import com.sanya.events.core.EventBus;
 
 /**
  * AppCore — ядро DI и базовой инфраструктуры (EventBus, ServiceRegistry)
