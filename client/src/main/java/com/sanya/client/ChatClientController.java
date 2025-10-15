@@ -94,7 +94,7 @@ public class ChatClientController {
                 com.sanya.client.files.FileSender.sendFile(
                         file,
                         context.getUserSettings().getName(),
-                        context.services().chat().getOutputStream(),
+                        context.services().chat()::sendObject,
                         context.getEventBus()
                 );
             } catch (Exception ex) {
@@ -110,19 +110,11 @@ public class ChatClientController {
      */
     public void exitApplication() {
         try {
-            // Очищаем подписки
-            if (context.getEventSubscriptionsManager() != null) {
+            if (context.getEventSubscriptionsManager() != null)
                 context.getEventSubscriptionsManager().unsubscribeAll();
-            }
-
-            // Закрываем соединение
-            if (context.services().chat().getOutputStream() != null) {
-                // Можно отправить сообщение о выходе, если нужно
-            }
 
             System.out.println("[ChatClientController] Application exit requested");
             System.exit(0);
-
         } catch (Exception e) {
             System.err.println("Error during application exit: " + e.getMessage());
             System.exit(1);

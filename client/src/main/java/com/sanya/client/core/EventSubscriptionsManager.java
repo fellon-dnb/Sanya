@@ -1,7 +1,8 @@
 package com.sanya.client.core;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.client.ChatClientConnector;
+
+import com.sanya.client.net.ChatConnector;
 import com.sanya.client.ui.UIFacade;
 import com.sanya.client.ui.dialog.ChatVoiceDialog;
 import com.sanya.events.*;
@@ -19,12 +20,12 @@ public class EventSubscriptionsManager {
 
     private final ApplicationContext context;
     private final UIFacade ui;
-    private final ChatClientConnector connector;
+    private final ChatConnector connector;
     private final List<Subscription> subscriptions;
 
     private ChatVoiceDialog currentVoiceDialog;
 
-    public EventSubscriptionsManager(ApplicationContext context, UIFacade ui, ChatClientConnector connector) {
+    public EventSubscriptionsManager(ApplicationContext context, UIFacade ui, ChatConnector connector) {
         this.context = context;
         this.ui = ui;
         this.connector = connector;
@@ -58,7 +59,7 @@ public class EventSubscriptionsManager {
         // Подписка на отправку сообщений (из UI в сеть)
         subscribe(MessageSendEvent.class, e -> {
             if (connector != null) {
-                connector.safeSendMessage(e.text());
+                connector.sendMessage(e.text());
             }
         });
 

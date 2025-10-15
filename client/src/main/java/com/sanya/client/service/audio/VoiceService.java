@@ -62,18 +62,18 @@ public class VoiceService {
 
         try {
             var username = ctx.getUserSettings().getName();
-            var out = ctx.services().chat().getOutputStream();
 
-            synchronized (out) {
-                out.writeObject(new VoiceMessageReadyEvent(username, data));
-                out.flush();
-            }
+            // просто шлём объект через ChatService
+            ctx.services().chat().sendObject(
+                    new VoiceMessageReadyEvent(username, data)
+            );
+
         } catch (Exception e) {
             ctx.getEventBus().publish(
                     new SystemMessageEvent("[ERROR] Отправка голосового сообщения: " + e.getMessage())
             );
         } finally {
-            // Сбрасываем флаг через 1 секунду
+            // сброс флага через 1 секунду
             new Thread(() -> {
                 try {
                     Thread.sleep(1000);

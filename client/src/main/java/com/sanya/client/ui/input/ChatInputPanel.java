@@ -81,7 +81,7 @@ public class ChatInputPanel extends JPanel {
                 com.sanya.client.files.FileSender.sendFile(
                         chosen,
                         ctx.getUserSettings().getName(),
-                        ctx.services().chat().getOutputStream(),
+                        ctx.services().chat()::sendObject,
                         ctx.getEventBus()
                 );
             } catch (Exception ex) {

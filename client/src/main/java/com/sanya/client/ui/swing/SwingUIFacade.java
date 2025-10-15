@@ -6,6 +6,7 @@ import com.sanya.client.ui.main.ChatMainPanel;
 import com.sanya.client.ui.NotificationManager;
 import com.sanya.events.SystemMessageEvent;
 import com.sanya.events.Theme;
+import com.sanya.events.SystemInfoEvent;
 
 import javax.swing.*;
 import java.io.File;
@@ -26,6 +27,8 @@ public class SwingUIFacade implements UIFacade {
 
         ctx.getEventBus().subscribe(SystemMessageEvent.class,
                 e -> NotificationManager.showError(e.message()));
+        ctx.getEventBus().subscribe(SystemInfoEvent.class,
+                e -> NotificationManager.showInfo(e.message()));
     }
 
     @Override
