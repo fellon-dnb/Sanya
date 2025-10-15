@@ -1,11 +1,11 @@
-package com.sanya.client;
+package com.sanya.client.settings;
 
-public class ConnectionInfo {
+public class NetworkSettings {
 
     private String host;
     private int port;
 
-    public ConnectionInfo(String host, int port) {
+    public NetworkSettings(String host, int port) {
         if (port > 0) {
             this.host = host;
             this.port = port;
@@ -35,7 +35,7 @@ public class ConnectionInfo {
 
     @Override
     public String toString() {
-        return "ConnectionInfo{" +
+        return "NetworkSettings{" +
                 "host='" + host + '\'' +
                 ", port=" + port +
                 '}';

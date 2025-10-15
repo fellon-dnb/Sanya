@@ -1,32 +1,59 @@
 package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.core.AppCore;
+import com.sanya.client.core.ServiceRegistry;
+import com.sanya.client.di.DependencyContainer;
+import com.sanya.client.service.ChatService;
+import com.sanya.client.service.audio.VoiceService;
+import com.sanya.client.settings.NetworkSettings;
+import com.sanya.client.settings.UiSettings;
+import com.sanya.client.settings.UserSettings;
+import com.sanya.client.ui.UIFacade;
 import com.sanya.events.EventBus;
 import com.sanya.events.SimpleEventBus;
-import com.sanya.events.Theme;
 
 public final class ApplicationContext {
 
-    private final ConnectionInfo connectionInfo;
-    private final UserInfo userInfo = new UserInfo();
+    private final DependencyContainer di = new DependencyContainer();
+
+    private final NetworkSettings networkSettings;
+    private final UserSettings userSettings = new UserSettings();
+    private final UiSettings uiSettings = new UiSettings();
     private final EventBus eventBus = new SimpleEventBus();
     private final CommandHandler commandHandler = new CommandHandler(this);
-    private Theme theme = Theme.DARK;
-    private boolean soundEnabled = true;
+    private final AppCore core = new AppCore(this);
+    private UIFacade uiFacade;
 
-    public ApplicationContext(ConnectionInfo connectionInfo) {
-        this.connectionInfo = connectionInfo;
+    public ApplicationContext(NetworkSettings networkSettings) {
+        this.networkSettings = networkSettings;
+
+        di.registerSingleton(EventBus.class, () -> eventBus);
+        di.registerSingleton(ApplicationContext.class, () -> this);
+        di.registerSingleton(ChatService.class, () -> core.services().chat());
+        di.registerSingleton(VoiceService.class, () -> core.services().voice());
     }
 
-    public ConnectionInfo getConnectionInfo() { return connectionInfo; }
+    public <T> T get(Class<T> type) {
+        return di.get(type);
+    }
+
+    public DependencyContainer di() { return di; }
     public EventBus getEventBus() { return eventBus; }
+    public NetworkSettings getNetworkSettings() { return networkSettings; }
+    public UiSettings getUiSettings() { return uiSettings; }
+    public UserSettings getUserSettings() { return userSettings; }
     public CommandHandler getCommandHandler() { return commandHandler; }
 
-    public Theme getTheme() { return theme; }
-    public void setTheme(Theme theme) { this.theme = theme; }
+    public AppCore core() { return core; }
+    public ServiceRegistry services() { return core.services(); }
 
-    public boolean isSoundEnabled() { return soundEnabled; }
-    public void setSoundEnabled(boolean soundEnabled) { this.soundEnabled = soundEnabled; }
+    public UIFacade getUIFacade() {
+        return uiFacade != null ? uiFacade : di.get(UIFacade.class);
+    }
 
-    public UserInfo getUserInfo() { return userInfo; }
+    public void setUIFacade(UIFacade uiFacade) {
+        this.uiFacade = uiFacade;
+        di.registerSingleton(UIFacade.class, () -> uiFacade);
+    }
 }
