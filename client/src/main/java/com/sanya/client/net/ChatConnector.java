@@ -40,16 +40,19 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
         this.transport.setListener(this);
         this.bus = bus;
         this.username = username;
+        log.config("Initializing ChatConnector for user: " + username + " (" + host + ":" + port + ")");
     }
 
     /** Подключение к серверу. */
     public void connect() {
+        log.config("Attempting to connect via ChatTransport...");
         try {
             transport.connect();
             transport.send(new Message(username, "<<<HELLO>>>"));
             bus.publish(new SystemInfoEvent("Connected to server"));
+            log.config("ChatConnector connection established successfully");
         } catch (IOException e) {
-            log.warning("[ChatConnector] Connect failed: " + e.getMessage());
+            log.log(Level.WARNING, "Connect failed", e);
             bus.publish(new ConnectionLostEvent(e.getMessage(), true));
             scheduleReconnect(1);
         }
@@ -88,10 +91,10 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
             } else if (obj instanceof VoiceMessageReadyEvent v) {
                 bus.publish(v);
             } else {
-                log.info("[ChatConnector] Unknown incoming: " + obj.getClass().getSimpleName());
+                log.fine("Unknown incoming object: " + obj.getClass().getSimpleName());
             }
         } catch (Exception ex) {
-            log.log(Level.WARNING, "[ChatConnector] Failed to process object", ex);
+            log.log(Level.WARNING, "Failed to process incoming object", ex);
         }
     }
 
@@ -102,28 +105,25 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
 
         String reason = cause != null ? cause.getMessage() : "Connection closed";
         bus.publish(new ConnectionLostEvent(reason, true));
-        log.info("[ChatConnector] Disconnected: " + reason);
+        log.info("Disconnected: " + reason);
 
-        if (manualClose) { // если закрытие было инициировано вручную
-            log.info("[ChatConnector] Manual close detected, skip reconnect");
+        if (manualClose) {
+            log.config("Manual close detected — skipping reconnect");
             return;
         }
 
         scheduleReconnect(1);
     }
 
-
-
     /** Авто-реконнект с экспоненциальным бэкофом. */
     private void scheduleReconnect(int attempt) {
         if (reconnecting.getAndSet(true)) return;
 
         int delay = Math.min(30, (int) Math.pow(2, attempt));
-        log.info("[ChatConnector] Reconnect in " + delay + "s");
+        log.config("Scheduling reconnect attempt " + attempt + " after " + delay + "s");
 
-        // защита: если shutdownHook уже вызвал close()
         if (scheduler.isShutdown() || scheduler.isTerminated()) {
-            log.info("[ChatConnector] Scheduler already shut down, skip reconnect");
+            log.warning("Scheduler already shut down, skipping reconnect");
             return;
         }
 
@@ -132,16 +132,16 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
                 connect();
                 reconnecting.set(false);
                 bus.publish(new SystemInfoEvent("Reconnected"));
+                log.config("Reconnection succeeded on attempt " + attempt);
             } catch (Exception e) {
-                log.warning("[ChatConnector] Reconnect attempt failed: " + e.getMessage());
+                log.log(Level.WARNING, "Reconnect attempt failed", e);
                 scheduleReconnect(attempt + 1);
             }
         }, delay, java.util.concurrent.TimeUnit.SECONDS);
     }
 
-
     private void handleSendError(IOException e) {
-        log.warning("[ChatConnector] Send failed: " + e.getMessage());
+        log.warning("Send failed: " + e.getMessage());
         bus.publish(new SystemMessageEvent("Send failed: " + e.getMessage()));
         onDisconnect(e);
     }
@@ -153,6 +153,7 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
     @Override
     public void close() {
         manualClose = true;
+        log.config("Closing ChatConnector manually");
         transport.close();
         scheduler.shutdownNow();
     }
