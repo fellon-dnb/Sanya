@@ -14,9 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * ChatServer — пересылает сообщения, файлы и голосовые пакеты.
- */
 public class ChatServer {
 
     private static int port;
@@ -44,23 +41,20 @@ public class ChatServer {
         private ObjectOutputStream out;
         private ObjectInputStream in;
 
-        ClientHandler(Socket socket) {
-            this.socket = socket;
-        }
+        ClientHandler(Socket socket) { this.socket = socket; }
 
-
+        @Override
         public void run() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
-                in = new ObjectInputStream(socket.getInputStream());
+                in  = new ObjectInputStream(socket.getInputStream());
 
-                // Первое сообщение — имя клиента
                 Message hello = (Message) in.readObject();
                 clientName = hello.getFrom();
                 clients.put(out, clientName);
-                System.out.println("Client connected: " + clientName);
+                System.out.println("[" + clientName + "] connected");
 
-                broadcast(new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
+                broadcastExcept(out, new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
                 updateUserList();
 
                 while (true) {
@@ -68,34 +62,26 @@ public class ChatServer {
                         Object obj = in.readObject();
 
                         if (obj instanceof Message msg) {
-                            System.out.println("[" + msg.getFrom() + "]: " + msg.getText());
-                            broadcast(msg);
-
+                            if (!"<<<HELLO>>>".equals(msg.getText())) broadcast(msg);
                         } else if (obj instanceof FileTransferRequest req) {
                             broadcast(req);
-
                         } else if (obj instanceof FileChunk chunk) {
                             broadcast(chunk);
-
                         } else if (obj instanceof VoiceRecordingEvent evt) {
                             broadcast(evt);
-
-                        } else if (obj instanceof VoiceMessageReadyEvent msg) {
-                            broadcast(msg);
-
+                        } else if (obj instanceof VoiceMessageReadyEvent v) {
+                            // важное: не шлём обратно отправителю
+                            broadcastExcept(out, v);
                         } else if (obj instanceof VoicePlayEvent play) {
                             broadcast(play);
                         }
 
                     } catch (EOFException | StreamCorruptedException e) {
-                        // Нормальное завершение потока — клиент закрыл соединение
                         break;
                     } catch (SocketException e) {
-                        // Соединение разорвано со стороны клиента
                         System.out.println("Client disconnected (socket reset): " + clientName);
                         break;
                     } catch (Exception e) {
-                        // Любые другие ошибки логируем для отладки
                         System.err.println("Error handling client " + clientName + ": " + e.getMessage());
                         break;
                     }
@@ -105,37 +91,34 @@ public class ChatServer {
                 System.err.println("Client connection error: " + e.getMessage());
             } finally {
                 handleDisconnect();
-                try {
-                    if (in != null) in.close();
-                    if (out != null) out.close();
-                    if (socket != null && !socket.isClosed()) socket.close();
-                } catch (IOException ignored) {}
+                try { if (in != null) in.close(); } catch (IOException ignored) {}
+                try { if (out != null) out.close(); } catch (IOException ignored) {}
+                try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
             }
         }
 
-
         private void handleDisconnect() {
             if (clientName != null) {
-                System.out.println("Client disconnected: " + clientName);
                 clients.remove(out);
                 broadcast(new Message("SERVER", clientName + " left the chat", Message.Type.SYSTEM));
                 updateUserList();
+                System.out.println("[" + clientName + "] disconnected");
             }
-            try {
-                socket.close();
-            } catch (IOException ignored) {}
         }
     }
 
     private static void broadcast(Object obj) {
         clients.keySet().removeIf(out -> {
-            try {
-                out.writeObject(obj);
-                out.flush();
-                return false;
-            } catch (IOException e) {
-                return true;
-            }
+            try { out.writeObject(obj); out.flush(); return false; }
+            catch (IOException e) { return true; }
+        });
+    }
+
+    private static void broadcastExcept(ObjectOutputStream exclude, Object obj) {
+        clients.keySet().removeIf(out -> {
+            if (out == exclude) return false;
+            try { out.writeObject(obj); out.flush(); return false; }
+            catch (IOException e) { return true; }
         });
     }
 

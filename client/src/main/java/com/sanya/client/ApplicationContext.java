@@ -1,6 +1,8 @@
 package com.sanya.client;
 
 import com.sanya.client.commands.CommandHandler;
+import com.sanya.client.core.AppCore;
+import com.sanya.client.core.ServiceRegistry;
 import com.sanya.client.di.DependencyContainer;
 import com.sanya.client.service.ChatService;
 import com.sanya.client.service.audio.VoiceService;
@@ -11,83 +13,41 @@ import com.sanya.client.ui.UIFacade;
 import com.sanya.events.EventBus;
 import com.sanya.events.SimpleEventBus;
 
-/**
- * Контекст приложения.
- * Объединяет все основные зависимости клиента (сервисный слой, UI, настройки)
- * и поддерживает DI-контейнер для удобной регистрации/извлечения компонентов.
- */
 public final class ApplicationContext {
 
     private final DependencyContainer di = new DependencyContainer();
 
-    // --- обычные зависимости (как у тебя) ---
     private final NetworkSettings networkSettings;
     private final UserSettings userSettings = new UserSettings();
     private final UiSettings uiSettings = new UiSettings();
     private final EventBus eventBus = new SimpleEventBus();
     private final CommandHandler commandHandler = new CommandHandler(this);
-    private final Services services = new Services(this);
+    private final AppCore core = new AppCore(this);
     private UIFacade uiFacade;
 
-    //  конструктор
     public ApplicationContext(NetworkSettings networkSettings) {
         this.networkSettings = networkSettings;
 
-        // Регистрация базовых зависимостей в DI
         di.registerSingleton(EventBus.class, () -> eventBus);
-        di.registerSingleton(ChatService.class, () -> services.chat());
         di.registerSingleton(ApplicationContext.class, () -> this);
-        di.registerSingleton(VoiceService.class, () -> new VoiceService(this));
+        di.registerSingleton(ChatService.class, () -> core.services().chat());
+        di.registerSingleton(VoiceService.class, () -> core.services().voice());
     }
 
-    //  доступ к DI
     public <T> T get(Class<T> type) {
         return di.get(type);
     }
 
-    public DependencyContainer di() {
-        return di;
-    }
+    public DependencyContainer di() { return di; }
+    public EventBus getEventBus() { return eventBus; }
+    public NetworkSettings getNetworkSettings() { return networkSettings; }
+    public UiSettings getUiSettings() { return uiSettings; }
+    public UserSettings getUserSettings() { return userSettings; }
+    public CommandHandler getCommandHandler() { return commandHandler; }
 
-    //  стандартные геттеры
-    public EventBus getEventBus() {
-        return eventBus;
-    }
+    public AppCore core() { return core; }
+    public ServiceRegistry services() { return core.services(); }
 
-    public NetworkSettings getNetworkSettings() {
-        return networkSettings;
-    }
-
-    public UiSettings getUiSettings() {
-        return uiSettings;
-    }
-
-    public UserSettings getUserSettings() {
-        return userSettings;
-    }
-
-    public CommandHandler getCommandHandler() {
-        return commandHandler;
-    }
-
-    public Services services() {
-        return services;
-    }
-
-    //  вложенный класс для сервисов
-    public static class Services {
-        private final ChatService chatService;
-
-        public Services(ApplicationContext ctx) {
-            chatService = new ChatService(ctx.getEventBus());
-        }
-
-        public ChatService chat() {
-            return chatService;
-        }
-    }
-
-    //  фасад UI
     public UIFacade getUIFacade() {
         return uiFacade != null ? uiFacade : di.get(UIFacade.class);
     }
