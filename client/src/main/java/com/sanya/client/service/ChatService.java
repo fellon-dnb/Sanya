@@ -1,53 +1,65 @@
 package com.sanya.client.service;
 
-import com.sanya.client.ChatClientConnector;
 import com.sanya.events.*;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * ChatService управляет взаимодействием чата через EventBus.
- * Также хранит ссылку на ChatClientConnector для передачи файлов и данных.
+ * Работает с любым транспортом, переданным через attachOutputSupplier().
  */
 public class ChatService {
+
     private final EventBus bus;
-    private ChatClientConnector connector;
+
+    // supplier проверяет активность соединения
+    private Supplier<Boolean> isConnectedSupplier;
+    // sender отвечает за отправку объектов
+    private Consumer<Object> objectSender;
 
     public ChatService(EventBus bus) {
         this.bus = bus;
     }
 
-    /** Привязать сетевой коннектор после подключения */
-    public void attachConnector(ChatClientConnector connector) {
-        this.connector = connector;
+    /**
+     * Привязка транспорта: логика отправки и проверки соединения.
+     */
+    public void attachOutputSupplier(Supplier<Boolean> isConnectedSupplier,
+                                     Consumer<Object> objectSender) {
+        this.isConnectedSupplier = isConnectedSupplier;
+        this.objectSender = objectSender;
     }
 
-    /** Отправка обычного текстового сообщения */
+    /** Отправка текстового сообщения. */
     public void sendMessage(String text) {
         bus.publish(new MessageSendEvent(text));
     }
 
-    /** Очистка чата */
+    /** Очистка чата. */
     public void clearChat() {
         bus.publish(new ClearChatEvent());
     }
 
-    /** Получение EventBus */
+    /** Проверка активного соединения. */
+    public boolean isConnected() {
+        return isConnectedSupplier != null && isConnectedSupplier.get();
+    }
+
+    /** Отправка объекта (файл, голос, и т.п.) напрямую в транспорт. */
+    public void sendObject(Object obj) {
+        if (objectSender == null) {
+            bus.publish(new SystemMessageEvent("[ERROR] Transport not attached"));
+            return;
+        }
+        try {
+            objectSender.accept(obj);
+        } catch (Exception e) {
+            bus.publish(new SystemMessageEvent("[ERROR] Send failed: " + e.getMessage()));
+        }
+    }
+
+    /** Получение EventBus. */
     public EventBus getBus() {
         return bus;
-    }
-
-    /** Доступ к ObjectOutputStream для передачи файлов и голосовых данных */
-    public java.io.ObjectOutputStream getOutputStream() {
-        if (connector == null) {
-            throw new IllegalStateException("ChatClientConnector not attached to ChatService");
-        }
-        return connector.getOutputStream();
-    }
-
-    public void onMessageReceived(EventHandler<MessageReceivedEvent> handler) {
-        bus.subscribe(MessageReceivedEvent.class, handler);
-    }
-
-    public void onUserListUpdated(EventHandler<UserListUpdatedEvent> handler) {
-        bus.subscribe(UserListUpdatedEvent.class, handler);
     }
 }

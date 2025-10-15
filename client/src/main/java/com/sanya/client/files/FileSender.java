@@ -5,28 +5,24 @@ import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferEvent;
 import com.sanya.files.FileTransferRequest;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.function.Consumer;
 
 public class FileSender {
 
-    public static void sendFile(File file, String username, ObjectOutputStream out, EventBus eventBus) throws IOException {
+    public static void sendFile(File file, String username,
+                                Consumer<Object> sender, EventBus eventBus) throws Exception {
+
         long totalBytes = file.length();
         long sentBytes = 0;
-        int bufferSize = 8192; // 8 KB
+        int bufferSize = 8192;
         byte[] buffer = new byte[bufferSize];
 
-        // уведомляем сервер о начале передачи
-        FileTransferRequest request = new FileTransferRequest(username, file.getName(), totalBytes);
-        out.writeObject(request);
-        out.flush();
+        sender.accept(new FileTransferRequest(username, file.getName(), totalBytes));
 
         eventBus.publish(new FileTransferEvent(
-                FileTransferEvent.Type.STARTED,
-                file.getName(),
-                0,
-                totalBytes,
-                true,
-                null
+                FileTransferEvent.Type.STARTED, file.getName(), 0, totalBytes, true, null
         ));
 
         try (FileInputStream fis = new FileInputStream(file)) {
@@ -35,37 +31,21 @@ public class FileSender {
             while ((read = fis.read(buffer)) != -1) {
                 boolean last = (sentBytes + read) >= totalBytes;
                 FileChunk chunk = new FileChunk(file.getName(), buffer.clone(), part++, last);
-                out.writeObject(chunk);
-                out.flush();
+                sender.accept(chunk);
                 sentBytes += read;
 
                 eventBus.publish(new FileTransferEvent(
-                        FileTransferEvent.Type.PROGRESS,
-                        file.getName(),
-                        sentBytes,
-                        totalBytes,
-                        true,
-                        null
+                        FileTransferEvent.Type.PROGRESS, file.getName(), sentBytes, totalBytes, true, null
                 ));
             }
 
             eventBus.publish(new FileTransferEvent(
-                    FileTransferEvent.Type.COMPLETED,
-                    file.getName(),
-                    totalBytes,
-                    totalBytes,
-                    true,
-                    null
+                    FileTransferEvent.Type.COMPLETED, file.getName(), totalBytes, totalBytes, true, null
             ));
 
         } catch (Exception e) {
             eventBus.publish(new FileTransferEvent(
-                    FileTransferEvent.Type.FAILED,
-                    file.getName(),
-                    sentBytes,
-                    totalBytes,
-                    true,
-                    e.getMessage()
+                    FileTransferEvent.Type.FAILED, file.getName(), sentBytes, totalBytes, true, e.getMessage()
             ));
             throw e;
         }
