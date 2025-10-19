@@ -12,13 +12,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
-
+import com.sanya.crypto.SignedPreKeyBundle;
 /**
  * Центральный сервер чата Sanya.
  * Поддерживает обмен сообщениями, файлами и голосовыми событиями.
@@ -31,6 +32,7 @@ public class ChatServer {
 
     private ServerSocket serverSocket;
     private volatile boolean running;
+    private static final Map<String, SignedPreKeyBundle> signedBundles = new ConcurrentHashMap<>();
 
     // === Точка входа ===
     public static void main(String[] args) {
@@ -98,7 +100,10 @@ public class ChatServer {
         log.info("Stopping ChatServer...");
 
         for (ObjectOutputStream out : clients.keySet()) {
-            try { out.close(); } catch (IOException ignored) {}
+            try {
+                out.close();
+            } catch (IOException ignored) {
+            }
         }
 
         clients.clear();
@@ -125,95 +130,140 @@ public class ChatServer {
         public void run() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
-                in  = new ObjectInputStream(socket.getInputStream());
+                in = new ObjectInputStream(socket.getInputStream());
 
+                // Первое сообщение от клиента — приветствие (HELLO)
                 Message hello = (Message) in.readObject();
                 clientName = hello.getFrom();
                 clients.put(out, clientName);
                 log.info("[" + clientName + "] connected");
 
+                // Оповещаем остальных
                 broadcastExcept(out, new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
                 updateUserList();
 
+                // === Основной цикл приёма объектов ===
                 while (true) {
-                    try {
-                        Object obj = in.readObject();
+                    Object obj = in.readObject();
 
-                        if (obj instanceof Message msg) {
-                            if (!"<<<HELLO>>>".equals(msg.getText())) broadcast(msg);
-                        } else if (obj instanceof FileTransferRequest req) {
-                            broadcast(req);
-                        } else if (obj instanceof FileChunk chunk) {
-                            broadcast(chunk);
-                        } else if (obj instanceof VoiceRecordingEvent evt) {
-                            broadcast(evt);
-                        } else if (obj instanceof VoiceMessageReadyEvent v) {
-                            broadcastExcept(out, v);
-                        } else if (obj instanceof VoicePlayEvent play) {
-                            broadcast(play);
-                        }
+                    // --- Криптография: публичные ключи клиентов ---
+                    if (obj instanceof com.sanya.crypto.SignedPreKeyBundle bundle) {
+                        signedBundles.put(bundle.getUsername(), bundle);
+                        log.info("Received bundle from " + bundle.getUsername());
 
-                    } catch (EOFException | StreamCorruptedException e) {
-                        break;
-                    } catch (SocketException e) {
-                        log.info("Client disconnected (socket reset): " + clientName);
-                        break;
-                    } catch (Exception e) {
-                        log.log(Level.WARNING, "Error handling client " + clientName, e);
-                        break;
+                        // Рассылаем остальным
+                        broadcastExcept(out, bundle);
+
+                        // Новому клиенту шлём все известные ключи других
+                        Map<String, com.sanya.crypto.SignedPreKeyBundle> others = new HashMap<>(signedBundles);
+                        others.remove(bundle.getUsername());
+                        out.writeObject(others);
+                        out.flush();
+                        continue;
                     }
+
+                    // --- Основные типы сообщений ---
+                    if (obj instanceof Message msg) {
+                        if (!"<<<HELLO>>>".equals(msg.getText())) {
+                            broadcast(msg);
+                        }
+                        continue;
+                    }
+
+                    if (obj instanceof FileTransferRequest req) {
+                        broadcast(req);
+                        continue;
+                    }
+
+                    if (obj instanceof FileChunk chunk) {
+                        broadcast(chunk);
+                        continue;
+                    }
+
+                    if (obj instanceof com.sanya.events.voice.VoiceRecordingEvent evt) {
+                        broadcast(evt);
+                        continue;
+                    }
+
+                    if (obj instanceof com.sanya.events.voice.VoiceMessageReadyEvent v) {
+                        broadcastExcept(out, v);
+                        continue;
+                    }
+
+                    if (obj instanceof com.sanya.events.voice.VoicePlayEvent play) {
+                        broadcast(play);
+                        continue;
+                    }
+
+                    // Неизвестный тип
+                    log.fine("Unknown object: " + obj.getClass().getName());
                 }
 
+            } catch (EOFException | StreamCorruptedException e) {
+                log.info("Client disconnected: " + clientName);
+            } catch (SocketException e) {
+                log.info("Socket reset: " + clientName);
             } catch (Exception e) {
-                log.log(Level.SEVERE, "Client connection error", e);
+                log.log(Level.WARNING, "Error handling client " + clientName, e);
             } finally {
                 handleDisconnect();
-                try { if (in != null) in.close(); } catch (IOException ignored) {}
-                try { if (out != null) out.close(); } catch (IOException ignored) {}
-                try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+                try {
+                    if (in != null) in.close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    if (out != null) out.close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    if (socket != null && !socket.isClosed()) socket.close();
+                } catch (IOException ignored) {
+                }
             }
         }
-
+        // обёртка
         private void handleDisconnect() {
             if (clientName != null) {
                 clients.remove(out);
+                signedBundles.remove(clientName);
                 broadcast(new Message("SERVER", clientName + " left the chat", Message.Type.SYSTEM));
                 updateUserList();
                 log.info("[" + clientName + "] disconnected");
             }
         }
-    }
 
-    // === Вспомогательные методы ===
-    private static void broadcast(Object obj) {
-        clients.keySet().removeIf(out -> {
-            try {
-                out.writeObject(obj);
-                out.flush();
-                return false;
-            } catch (IOException e) {
-                log.warning("Failed to broadcast to one client: " + e.getMessage());
-                return true;
-            }
-        });
-    }
 
-    private static void broadcastExcept(ObjectOutputStream exclude, Object obj) {
-        clients.keySet().removeIf(out -> {
-            if (out == exclude) return false;
-            try {
-                out.writeObject(obj);
-                out.flush();
-                return false;
-            } catch (IOException e) {
-                log.warning("Failed to broadcast (exclude mode): " + e.getMessage());
-                return true;
-            }
-        });
-    }
+        // === Вспомогательные методы ===
+        private static void broadcast(Object obj) {
+            clients.keySet().removeIf(out -> {
+                try {
+                    out.writeObject(obj);
+                    out.flush();
+                    return false;
+                } catch (IOException e) {
+                    log.warning("Failed to broadcast to one client: " + e.getMessage());
+                    return true;
+                }
+            });
+        }
 
-    private static void updateUserList() {
-        broadcast(new UserListUpdatedEvent(List.copyOf(clients.values())));
-        log.fine("User list updated, total clients: " + clients.size());
+        private static void broadcastExcept(ObjectOutputStream exclude, Object obj) {
+            clients.keySet().removeIf(out -> {
+                if (out == exclude) return false;
+                try {
+                    out.writeObject(obj);
+                    out.flush();
+                    return false;
+                } catch (IOException e) {
+                    log.warning("Failed to broadcast (exclude mode): " + e.getMessage());
+                    return true;
+                }
+            });
+        }
+
+        private static void updateUserList() {
+            broadcast(new UserListUpdatedEvent(List.copyOf(clients.values())));
+            log.fine("User list updated, total clients: " + clients.size());
+        }
     }
 }

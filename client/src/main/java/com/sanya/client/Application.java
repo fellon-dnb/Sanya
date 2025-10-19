@@ -49,6 +49,7 @@ public class Application {
 
                 // === Новый ChatConnector ===
                 ChatConnector connector = new ChatConnector(
+                        ctx,
                         networkSettings.getHost(),
                         networkSettings.getPort(),
                         ctx.getUserSettings().getName(),
@@ -62,8 +63,7 @@ public class Application {
                 ctx.services().chat().attachOutputSupplier(connector::isConnected, connector::sendObject);
 
                 // === Подписки ===
-                EventSubscriptionsManager subscriptionsManager =
-                        new EventSubscriptionsManager(ctx, facade, connector);
+                EventSubscriptionsManager subscriptionsManager = new EventSubscriptionsManager(ctx, facade, connector);
                 ctx.setEventSubscriptionsManager(subscriptionsManager);
                 subscriptionsManager.registerAllSubscriptions();
 
@@ -73,7 +73,6 @@ public class Application {
                                 (e.willReconnect() ? " (reconnecting...)" : "")));
 
                 new ChatClientController(ctx);
-
                 connector.connect();
                 ui.setVisible(true);
 

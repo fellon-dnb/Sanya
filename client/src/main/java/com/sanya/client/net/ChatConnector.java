@@ -1,6 +1,11 @@
 package com.sanya.client.net;
 
 import com.sanya.Message;
+import com.sanya.client.ApplicationContext;
+import com.sanya.crypto.Bytes;
+import com.sanya.crypto.KeyUtils;
+import com.sanya.crypto.SignatureUtils;
+import com.sanya.crypto.SignedPreKeyBundle;
 import com.sanya.events.chat.MessageReceivedEvent;
 import com.sanya.events.chat.UserListUpdatedEvent;
 import com.sanya.events.core.EventBus;
@@ -14,6 +19,9 @@ import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferRequest;
 
 import java.io.IOException;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,7 +35,7 @@ import java.util.logging.Logger;
 public class ChatConnector implements ChatTransport.TransportListener, AutoCloseable {
 
     private static final Logger log = Logger.getLogger(ChatConnector.class.getName());
-
+    private final ApplicationContext ctx;
     private final ChatTransport transport;
     private final EventBus bus;
     private final String username;
@@ -35,7 +43,8 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
     private volatile boolean manualClose = false;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-    public ChatConnector(String host, int port, String username, EventBus bus) {
+    public ChatConnector(ApplicationContext ctx, String host, int port, String username, EventBus bus) {
+        this.ctx = ctx;
         this.transport = new ChatTransport(host, port);
         this.transport.setListener(this);
         this.bus = bus;
@@ -49,12 +58,30 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
         try {
             transport.connect();
             transport.send(new Message(username, "<<<HELLO>>>"));
+
+            // === crypto handshake ===
+            byte[] xpub = KeyUtils.x25519Raw((java.security.interfaces.XECPublicKey)
+                    ctx.getX25519KeyPair().getPublic());
+            byte[] toSign = Bytes.concat(Bytes.utf8(username), xpub);
+            byte[] sig = SignatureUtils.signEd25519(
+                    ctx.getEd25519KeyPair().getPrivate(), toSign);
+
+            SignedPreKeyBundle bundle = new SignedPreKeyBundle(
+                    username,
+                    xpub,
+                    ctx.getEd25519KeyPair().getPublic().getEncoded(),
+                    sig,
+                    System.currentTimeMillis()
+            );
+
+            transport.send(bundle);
+            log.info("Sent SignedPreKeyBundle for " + username);
+
             bus.publish(new SystemInfoEvent("Connected to server"));
-            log.config("ChatConnector connection established successfully");
         } catch (IOException e) {
-            log.log(Level.WARNING, "Connect failed", e);
-            bus.publish(new ConnectionLostEvent(e.getMessage(), true));
-            scheduleReconnect(1);
+            handleSendError(e);
+        } catch (Exception e) {
+            log.log(Level.SEVERE, "Crypto handshake failed", e);
         }
     }
 
@@ -79,22 +106,35 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
     /** Обработка входящего объекта. */
     @Override
     public void onMessage(Object obj) {
-        try {
-            if (obj instanceof Message msg) {
-                bus.publish(new MessageReceivedEvent(msg));
-            } else if (obj instanceof UserListUpdatedEvent e) {
-                bus.publish(e);
-            } else if (obj instanceof FileTransferRequest e) {
-                bus.publish(new FileIncomingEvent(e, null));
-            } else if (obj instanceof FileChunk c) {
-                bus.publish(new FileChunkEvent(c));
-            } else if (obj instanceof VoiceMessageReadyEvent v) {
-                bus.publish(v);
-            } else {
-                log.fine("Unknown incoming object: " + obj.getClass().getSimpleName());
+        if (obj instanceof SignedPreKeyBundle bundle) {
+            try {
+                PublicKey signPub = KeyFactory.getInstance("Ed25519")
+                        .generatePublic(new java.security.spec.X509EncodedKeySpec(bundle.getEd25519Public()));
+                boolean ok = SignatureUtils.verifyEd25519(
+                        signPub,
+                        Bytes.concat(Bytes.utf8(bundle.getUsername()), bundle.getX25519Public()),
+                        bundle.getSignature()
+                );
+                if (!ok) {
+                    log.warning("Signature invalid for bundle from " + bundle.getUsername());
+                    return;
+                }
+                ctx.getKnownBundles().put(bundle.getUsername(), bundle);
+                log.info("Stored verified bundle from " + bundle.getUsername());
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Failed to process SignedPreKeyBundle", e);
             }
-        } catch (Exception ex) {
-            log.log(Level.WARNING, "Failed to process incoming object", ex);
+            return;
+        }
+
+        if (obj instanceof Map<?, ?> map && !map.isEmpty()) {
+            Object any = map.values().iterator().next();
+            if (any instanceof SignedPreKeyBundle) {
+                @SuppressWarnings("unchecked")
+                Map<String, SignedPreKeyBundle> bundles = (Map<String, SignedPreKeyBundle>) map;
+                ctx.getKnownBundles().putAll(bundles);
+                log.info("Received bundle map size=" + bundles.size());
+            }
         }
     }
 
@@ -118,14 +158,8 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
     /** Авто-реконнект с экспоненциальным бэкофом. */
     private void scheduleReconnect(int attempt) {
         if (reconnecting.getAndSet(true)) return;
-
         int delay = Math.min(30, (int) Math.pow(2, attempt));
         log.config("Scheduling reconnect attempt " + attempt + " after " + delay + "s");
-
-        if (scheduler.isShutdown() || scheduler.isTerminated()) {
-            log.warning("Scheduler already shut down, skipping reconnect");
-            return;
-        }
 
         scheduler.schedule(() -> {
             try {
@@ -153,7 +187,6 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
     @Override
     public void close() {
         manualClose = true;
-        log.config("Closing ChatConnector manually");
         transport.close();
         scheduler.shutdownNow();
     }

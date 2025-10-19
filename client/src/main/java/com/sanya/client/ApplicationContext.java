@@ -11,8 +11,14 @@ import com.sanya.client.settings.NetworkSettings;
 import com.sanya.client.settings.UiSettings;
 import com.sanya.client.settings.UserSettings;
 import com.sanya.client.facade.UIFacade;
+import com.sanya.crypto.KeyUtils;
+import com.sanya.crypto.SignedPreKeyBundle;
 import com.sanya.events.core.EventBus;
 import com.sanya.events.core.SimpleEventBus;
+
+import java.security.KeyPair;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ApplicationContext {
 
@@ -26,10 +32,18 @@ public final class ApplicationContext {
     private final AppCore core = new AppCore(this);
     private UIFacade uiFacade;
     private EventSubscriptionsManager eventSubscriptionsManager;
+    private KeyPair x25519KeyPair;
+    private KeyPair ed25519KeyPair;
+    private final Map<String, SignedPreKeyBundle> knownBundles = new ConcurrentHashMap<>();
 
     public ApplicationContext(NetworkSettings networkSettings) {
         this.networkSettings = networkSettings;
-
+        try {
+            this.x25519KeyPair = KeyUtils.generateX25519();
+            this.ed25519KeyPair = KeyUtils.generateEd25519();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to init crypto keys", e);
+        }
         di.registerSingleton(EventBus.class, () -> eventBus);
         di.registerSingleton(ApplicationContext.class, () -> this);
         di.registerSingleton(ChatService.class, () -> core.services().chat());
@@ -66,4 +80,7 @@ public final class ApplicationContext {
     public void setEventSubscriptionsManager(EventSubscriptionsManager eventSubscriptionsManager) {
         this.eventSubscriptionsManager = eventSubscriptionsManager;
     }
+    public KeyPair getX25519KeyPair() { return x25519KeyPair; }
+    public KeyPair getEd25519KeyPair() { return ed25519KeyPair; }
+    public Map<String, SignedPreKeyBundle> getKnownBundles() { return knownBundles; }
 }
