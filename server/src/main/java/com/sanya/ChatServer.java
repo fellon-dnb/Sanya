@@ -33,6 +33,8 @@ public class ChatServer {
     private ServerSocket serverSocket;
     private volatile boolean running;
     private static final Map<String, SignedPreKeyBundle> signedBundles = new ConcurrentHashMap<>();
+    private static final Map<String, ObjectOutputStream> userOut = new ConcurrentHashMap<>();
+    private static final Map<String, String> userPubB64 = new ConcurrentHashMap<>();
 
     // === Точка входа ===
     public static void main(String[] args) {
@@ -136,7 +138,9 @@ public class ChatServer {
                 Message hello = (Message) in.readObject();
                 clientName = hello.getFrom();
                 clients.put(out, clientName);
+                userOut.put(clientName, out);
                 log.info("[" + clientName + "] connected");
+
 
                 // Оповещаем остальных
                 broadcastExcept(out, new Message("SERVER", clientName + " entered the chat", Message.Type.SYSTEM));
@@ -194,6 +198,32 @@ public class ChatServer {
                         broadcast(play);
                         continue;
                     }
+                    else if (obj instanceof com.sanya.crypto.msg.KeyHello hk) {
+                        userPubB64.put(hk.username(), hk.x25519PublicKeyB64());
+                        var snap = new com.sanya.crypto.msg.KeyDirectoryUpdate(Map.copyOf(userPubB64));
+                        broadcast(snap);
+                    }
+                    else if (obj instanceof com.sanya.crypto.msg.EncryptedDirectMessage dm) {
+                        ObjectOutputStream dst = userOut.get(dm.to());
+                        if (dst != null) {
+                            try {
+                                dst.writeObject(dm);
+                                dst.flush();
+                            } catch (IOException ignore) {}
+                        }
+                    }
+                    else if (obj instanceof com.sanya.crypto.msg.KeyHello hk) {
+                        userPubB64.put(hk.username(), hk.x25519PublicKeyB64());
+                        var snap = new com.sanya.crypto.msg.KeyDirectoryUpdate(Map.copyOf(userPubB64));
+                        broadcast(snap);
+                    }
+                    else if (obj instanceof com.sanya.crypto.msg.EncryptedDirectMessage dm) {
+                        ObjectOutputStream dst = userOut.get(dm.to());
+                        if (dst != null) {
+                            try { dst.writeObject(dm); dst.flush(); } catch (IOException ignore) {}
+                        }
+                    }
+
 
                     // Неизвестный тип
                     log.fine("Unknown object: " + obj.getClass().getName());
@@ -228,6 +258,8 @@ public class ChatServer {
                 signedBundles.remove(clientName);
                 broadcast(new Message("SERVER", clientName + " left the chat", Message.Type.SYSTEM));
                 updateUserList();
+                userOut.remove(clientName);
+                userPubB64.remove(clientName);
                 log.info("[" + clientName + "] disconnected");
             }
         }

@@ -15,8 +15,9 @@ public interface EventBus {
      */
     <E> void unsubscribe(Class<E> eventType, EventHandler<? super E> handler);
 
-    /**
-     * Публикует событие.
-     */
+    /** Публикует событие по его реальному типу. */
     void publish(Object event);
+
+    /** Публикует событие с явным указанием класса (для совместимости). */
+    void publish(Class<?> eventClass, Object event);
 }

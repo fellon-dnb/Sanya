@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import com.sanya.events.core.EventBus;
 /**
  * Потокобезопасная реализация EventBus с поддержкой иерархии событий и логированием.
  */
@@ -13,6 +13,7 @@ public class SimpleEventBus implements EventBus {
 
     private static final Logger log = Logger.getLogger(SimpleEventBus.class.getName());
 
+    // Хранилище подписчиков: тип события -> список обработчиков
     private final Map<Class<?>, List<EventHandler<?>>> subscribers = new ConcurrentHashMap<>();
 
     @Override
@@ -33,7 +34,11 @@ public class SimpleEventBus implements EventBus {
         }
     }
 
-    @Override
+    /**
+     * Универсальная публикация события.
+     * Совместимо с интерфейсом EventBus, который ожидает publish(Object).
+     */
+
     @SuppressWarnings("unchecked")
     public void publish(Object event) {
         if (event == null) return;
@@ -62,6 +67,30 @@ public class SimpleEventBus implements EventBus {
         }
     }
 
+    /**
+     * Вариант публикации с явным указанием типа события.
+     * Добавлен для совместимости, если интерфейс EventBus содержит метод publish(Class, Object).
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public void publish(Class<?> eventType, Object event) {
+        if (event == null || eventType == null) return;
+
+        List<EventHandler<?>> handlers = subscribers.get(eventType);
+        if (handlers != null) {
+            for (EventHandler<?> handler : handlers) {
+                try {
+                    ((EventHandler<Object>) handler).handle(event);
+                } catch (Exception e) {
+                    log.log(Level.SEVERE, "Error in event handler for " + eventType.getSimpleName(), e);
+                }
+            }
+        } else {
+            log.fine(() -> "No subscribers for event " + eventType.getSimpleName());
+        }
+    }
+
+    /** Собирает всю иерархию классов и интерфейсов для поиска подписчиков. */
     private Set<Class<?>> collectHierarchy(Class<?> clazz) {
         Set<Class<?>> result = new LinkedHashSet<>();
         while (clazz != null && clazz != Object.class) {
