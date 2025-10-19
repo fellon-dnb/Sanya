@@ -12,6 +12,9 @@ target/
 *.docx
 out/
 target/
+logs/
+*.log
+*.lck
 
 ### Eclipse ###
 .apt_generated
