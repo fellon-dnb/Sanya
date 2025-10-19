@@ -23,11 +23,12 @@ public class Application {
     private static final Logger log = Logger.getLogger(Application.class.getName());
 
     public void start(Arguments args) {
+        // настройка сети
         NetworkSettings networkSettings = new NetworkSettings(
                 args.get(String.class, new String[]{"--host", "-h"}, "localhost"),
                 args.get(Integer.class, new String[]{"--port", "-p"}, 12345)
         );
-
+        // контекст
         String usernameFromCli = args.get(String.class, new String[]{"--username", "-u"}, "");
 
         ApplicationContext ctx = new ApplicationContext(networkSettings);
