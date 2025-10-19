@@ -2,10 +2,7 @@ package com.sanya.client.net;
 
 import com.sanya.Message;
 import com.sanya.client.ApplicationContext;
-import com.sanya.crypto.Bytes;
-import com.sanya.crypto.KeyUtils;
-import com.sanya.crypto.SignatureUtils;
-import com.sanya.crypto.SignedPreKeyBundle;
+import com.sanya.crypto.*;
 import com.sanya.events.chat.MessageReceivedEvent;
 import com.sanya.events.chat.UserListUpdatedEvent;
 import com.sanya.events.core.EventBus;
@@ -18,6 +15,7 @@ import com.sanya.events.voice.VoiceMessageReadyEvent;
 import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferRequest;
 
+import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -87,12 +85,51 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
 
     /** Отправка текстового сообщения. */
     public void sendMessage(String text) {
+        if (text == null || text.isBlank()) return;
+
         try {
-            transport.send(new Message(username, text));
+            String self = username;
+            Map<String, SignedPreKeyBundle> bundles = ctx.getKnownBundles();
+
+            // Если нет известных ключей — отправляем в открытом виде
+            if (bundles.isEmpty()) {
+                transport.send(new Message(self, text));
+                return;
+            }
+
+            // Для каждого известного получателя
+            for (String peer : bundles.keySet()) {
+                if (peer.equals(self)) continue;
+                try {
+                    // === Вычисляем общий секрет ===
+                    var bundle = ctx.getKnownBundles().get(peer);
+                    var peerPub = KeyUtils.x25519FromRaw(bundle.getX25519Public());
+                    byte[] shared = KeyUtils.sharedSecret(ctx.getX25519KeyPair().getPrivate(), peerPub);
+                    byte[] aesKeyBytes = HKDF.deriveAesKey(shared, null, "Sanya-Chat-AES");
+                    SecretKey aesKey = new javax.crypto.spec.SecretKeySpec(aesKeyBytes, "AES");
+
+                    // === Шифруем текст ===
+                    byte[] aad = Bytes.concat(Bytes.utf8(self), Bytes.utf8(peer));
+                    var box = AesGcm.encrypt(aesKey, Bytes.utf8(text), aad);
+
+                    // === Упаковываем в EncryptedPayload ===
+                    EncryptedPayload payload = new EncryptedPayload(box.iv, box.ct, aad);
+
+                    // === Заворачиваем в Message ===
+                    Message msg = new Message(self, "[encrypted]");
+                    msg.setAttachment(payload);
+
+                    transport.send(msg);
+                    log.fine("Encrypted message sent to " + peer);
+                } catch (Exception e) {
+                    log.log(Level.WARNING, "Encryption failed for " + peer, e);
+                }
+            }
         } catch (IOException e) {
-            handleSendError(e);
+            log.log(Level.WARNING, "Send failed", e);
         }
     }
+
 
     /** Отправка произвольного объекта (файл, голос и т.п.). */
     public void sendObject(Object obj) {
@@ -190,4 +227,31 @@ public class ChatConnector implements ChatTransport.TransportListener, AutoClose
         transport.close();
         scheduler.shutdownNow();
     }
+    // === Вспомогательная логика шифрования/дешифрования ===
+    private byte[] deriveSharedKey(String peer) throws Exception {
+        var bundle = ctx.getKnownBundles().get(peer);
+        if (bundle == null) return null;
+
+        PublicKey peerPub = KeyUtils.x25519FromRaw(bundle.getX25519Public());
+        byte[] shared = KeyUtils.sharedSecret(ctx.getX25519KeyPair().getPrivate(), peerPub);
+        return HKDF.deriveAesKey(shared, null, "Sanya-Chat-AES");
+    }
+
+    private String decryptMessage(String sender, byte[] iv, byte[] ciphertext, byte[] aad) throws Exception {
+        byte[] keyBytes = deriveSharedKey(sender);
+        if (keyBytes == null) return "[UNVERIFIED USER]";
+        javax.crypto.SecretKey key = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+        byte[] plain = AesGcm.decrypt(key, iv, ciphertext, aad);
+        return new String(plain, java.nio.charset.StandardCharsets.UTF_8);
+    }
+    // === Вспомогательная структура для передачи шифрованных блоков ===
+    private static final class EncryptedPayload implements java.io.Serializable {
+        final byte[] iv;
+        final byte[] ct;
+        final byte[] aad;
+        EncryptedPayload(byte[] iv, byte[] ct, byte[] aad) {
+            this.iv = iv; this.ct = ct; this.aad = aad;
+        }
+    }
+
 }

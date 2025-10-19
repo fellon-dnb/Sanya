@@ -32,3 +32,5 @@
 [2025-10-19 20:03:56] [INFO] com.sanya.ChatServer - Received bundle from xcxxv 
 [2025-10-19 20:04:04] [INFO] com.sanya.ChatServer - Client disconnected: xcxxv 
 [2025-10-19 20:04:04] [INFO] com.sanya.ChatServer - [xcxxv] disconnected 
+[2025-10-19 20:06:54] [INFO] com.sanya.ChatServer - Client disconnected: qwe 
+[2025-10-19 20:06:54] [INFO] com.sanya.ChatServer - [qwe] disconnected 
