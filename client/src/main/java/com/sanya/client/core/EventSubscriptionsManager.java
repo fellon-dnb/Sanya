@@ -46,7 +46,7 @@ public class EventSubscriptionsManager {
     }
 
     /**
-     * Регистрирует все подписки приложения
+     * Регистрирует все подписки
      */
     public void registerAllSubscriptions() {
         log.info("Registering voice subscriptions, total so far: " + subscriptions.size());
@@ -59,9 +59,7 @@ public class EventSubscriptionsManager {
         log.info("Registered " + subscriptions.size() + " event subscriptions");
     }
 
-    /**
-     * Отменяет все подписки (для cleanup при закрытии приложения)
-     */
+
     public void unsubscribeAll() {
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();

@@ -2,11 +2,13 @@ package com.sanya.client;
 
 import com.ancevt.replines.core.argument.Arguments;
 import com.sanya.client.core.EventSubscriptionsManager;
-import com.sanya.client.net.ChatConnector;
-import com.sanya.client.settings.NetworkSettings;
-import com.sanya.client.ui.ChatClientUI;
 import com.sanya.client.facade.UIFacade;
 import com.sanya.client.facade.swing.SwingUIFacade;
+import com.sanya.client.net.ChatConnector;
+import com.sanya.client.security.Encryptor;
+import com.sanya.client.security.KeyDirectory;
+import com.sanya.client.settings.NetworkSettings;
+import com.sanya.client.ui.ChatClientUI;
 import com.sanya.events.system.ConnectionLostEvent;
 
 import javax.swing.*;
@@ -20,18 +22,31 @@ import java.util.logging.Logger;
  * Настраивает контекст, GUI и сетевое подключение.
  */
 public class Application {
+
     private static final Logger log = Logger.getLogger(Application.class.getName());
 
     public void start(Arguments args) {
+        // === Настройка сети ===
         NetworkSettings networkSettings = new NetworkSettings(
                 args.get(String.class, new String[]{"--host", "-h"}, "localhost"),
                 args.get(Integer.class, new String[]{"--port", "-p"}, 12345)
         );
 
+        // === Имя пользователя из CLI ===
         String usernameFromCli = args.get(String.class, new String[]{"--username", "-u"}, "");
 
+        // === Контекст приложения ===
         ApplicationContext ctx = new ApplicationContext(networkSettings);
 
+        // === Инициализация криптографии ===
+        var keyDir = new KeyDirectory();
+        var encryptor = new Encryptor(keyDir);
+
+        // Регистрируем в DI
+        ctx.di().registerSingleton(KeyDirectory.class, () -> keyDir);
+        ctx.di().registerSingleton(Encryptor.class, () -> encryptor);
+
+        // === UI и запуск ===
         SwingUtilities.invokeLater(() -> {
             try {
                 String username = usernameFromCli.isEmpty()
@@ -42,45 +57,49 @@ public class Application {
                 ctx.getUserSettings().setName(username);
 
                 ChatClientUI ui = new ChatClientUI(ctx);
-
                 UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
                 ctx.setUIFacade(facade);
 
-                // === Новый ChatConnector ===
+                // === Создаём ChatConnector с поддержкой шифрования ===
                 ChatConnector connector = new ChatConnector(
+                        ctx,
                         networkSettings.getHost(),
                         networkSettings.getPort(),
                         ctx.getUserSettings().getName(),
-                        ctx.getEventBus()
+                        ctx.getEventBus(),
+                        keyDir,
+                        encryptor
                 );
 
-// Регистрация коннектора в DI-контейнере
+                // Регистрируем коннектор
                 ctx.di().registerSingleton(ChatConnector.class, () -> connector);
 
-// Передаём ChatService логику отправки
+                // Подключаем ChatService к коннектору
                 ctx.services().chat().attachOutputSupplier(connector::isConnected, connector::sendObject);
 
                 // === Подписки ===
-                EventSubscriptionsManager subscriptionsManager =
-                        new EventSubscriptionsManager(ctx, facade, connector);
+                EventSubscriptionsManager subscriptionsManager = new EventSubscriptionsManager(ctx, facade, connector);
                 ctx.setEventSubscriptionsManager(subscriptionsManager);
                 subscriptionsManager.registerAllSubscriptions();
 
-                // === Подписка на потерю соединения ===
+                // === Реакция на потерю соединения ===
                 ctx.getEventBus().subscribe(ConnectionLostEvent.class, e ->
                         ctx.getUIFacade().showWarning("[NETWORK] " + e.reason() +
                                 (e.willReconnect() ? " (reconnecting...)" : "")));
 
+                // === Контроллер UI ===
                 new ChatClientController(ctx);
 
+                // === Запуск соединения ===
                 connector.connect();
+
                 ui.setVisible(true);
 
+                // === Завершение работы ===
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     log.info("Shutdown hook executed");
-                    if (ctx.getEventSubscriptionsManager() != null) {
+                    if (ctx.getEventSubscriptionsManager() != null)
                         ctx.getEventSubscriptionsManager().unsubscribeAll();
-                    }
                     connector.close();
                 }));
 
@@ -99,7 +118,6 @@ public class Application {
         // === Настройка логгера ===
         try {
             java.nio.file.Files.createDirectories(java.nio.file.Path.of("logs"));
-
             try (InputStream input = Application.class.getResourceAsStream("/logging.properties")) {
                 if (input != null) {
                     LogManager.getLogManager().readConfiguration(input);
@@ -121,5 +139,4 @@ public class Application {
             System.exit(1);
         }
     }
-
 }

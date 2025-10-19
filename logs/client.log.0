@@ -1,0 +1,40 @@
+[2025-10-15 21:18:22] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-15 21:18:23] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-15 21:18:52] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-15 21:18:52] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatTransport - ChatTransport created for localhost:12345 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: цц (localhost:12345) 
+[2025-10-15 21:18:54] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-15 21:18:54] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-15 21:18:54] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatConnector - Attempting to connect via ChatTransport... 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatTransport - Connecting to localhost:12345 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatTransport - Socket connected to localhost/127.0.0.1:12345 
+[2025-10-15 21:18:54] [INFO] com.sanya.client.net.ChatTransport - Connected to localhost:12345 
+[2025-10-15 21:18:54] [CONFIG] com.sanya.client.net.ChatConnector - ChatConnector connection established successfully 
+[2025-10-17 15:15:22] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-17 15:15:22] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatTransport - ChatTransport created for localhost:12345 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 1й (localhost:12345) 
+[2025-10-17 15:15:25] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-17 15:15:25] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-17 15:15:25] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatConnector - Attempting to connect via ChatTransport... 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatTransport - Connecting to localhost:12345 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatTransport - Socket connected to localhost/127.0.0.1:12345 
+[2025-10-17 15:15:25] [INFO] com.sanya.client.net.ChatTransport - Connected to localhost:12345 
+[2025-10-17 15:15:25] [CONFIG] com.sanya.client.net.ChatConnector - ChatConnector connection established successfully 
+[2025-10-17 17:30:59] [INFO] com.sanya.client.Application - Shutdown hook executed 
+[2025-10-19 20:03:41] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-19 20:03:41] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-19 20:03:44] [CONFIG] com.sanya.client.net.ChatTransport - ChatTransport created for localhost:12345 
+[2025-10-19 20:03:44] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: qwe (localhost:12345) 
+[2025-10-19 20:03:44] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-19 20:03:44] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-19 20:03:44] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-19 20:03:44] [CONFIG] com.sanya.client.net.ChatConnector - Attempting to connect via ChatTransport... 
+[2025-10-19 20:03:44] [CONFIG] com.sanya.client.net.ChatTransport - Connecting to localhost:12345 
+[2025-10-19 20:03:44] [CONFIG] com.sanya.client.net.ChatTransport - Socket connected to localhost/127.0.0.1:12345 
+[2025-10-19 20:03:44] [INFO] com.sanya.client.net.ChatTransport - Connected to localhost:12345 
+[2025-10-19 20:03:44] [INFO] com.sanya.client.net.ChatConnector - Sent SignedPreKeyBundle for qwe 
+[2025-10-19 20:03:56] [INFO] com.sanya.client.net.ChatConnector - Stored verified bundle from xcxxv 

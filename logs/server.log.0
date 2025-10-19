@@ -1,0 +1,36 @@
+[2025-10-15 21:18:46] [INFO] com.sanya.ChatServer - Server logging configuration loaded successfully 
+[2025-10-15 21:18:46] [INFO] com.sanya.ChatServer - Starting ChatServer... 
+[2025-10-15 21:18:46] [INFO] com.sanya.ChatServer - Server listening on port 12345 
+[2025-10-15 21:18:54] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:49692 
+[2025-10-15 21:18:54] [INFO] com.sanya.ChatServer - [цц] connected 
+[2025-10-15 21:19:03] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:49874 
+[2025-10-15 21:19:03] [INFO] com.sanya.ChatServer - [иии] connected 
+[2025-10-15 21:19:21] [INFO] com.sanya.ChatServer - [цц] disconnected 
+[2025-10-15 21:19:22] [INFO] com.sanya.ChatServer - [иии] disconnected 
+[2025-10-17 15:15:16] [INFO] com.sanya.ChatServer - Server logging configuration loaded successfully 
+[2025-10-17 15:15:16] [INFO] com.sanya.ChatServer - Starting ChatServer... 
+[2025-10-17 15:15:16] [INFO] com.sanya.ChatServer - Server listening on port 12345 
+[2025-10-17 15:15:25] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:56865 
+[2025-10-17 15:15:25] [INFO] com.sanya.ChatServer - [1й] connected 
+[2025-10-17 15:15:34] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:56875 
+[2025-10-17 15:15:34] [INFO] com.sanya.ChatServer - [2й] connected 
+[2025-10-17 15:15:40] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:50791 
+[2025-10-17 15:15:40] [INFO] com.sanya.ChatServer - [3й] connected 
+[2025-10-17 15:36:48] [INFO] com.sanya.ChatServer - Client connected: /141.98.10.78:33572 
+[2025-10-17 15:36:48] [SEVERE] com.sanya.ChatServer - Client connection error 
+[2025-10-17 17:30:59] [INFO] com.sanya.ChatServer - [1й] disconnected 
+[2025-10-17 17:31:01] [INFO] com.sanya.ChatServer - [2й] disconnected 
+[2025-10-17 17:31:02] [INFO] com.sanya.ChatServer - [3й] disconnected 
+[2025-10-19 20:03:34] [INFO] com.sanya.ChatServer - Server logging configuration loaded successfully 
+[2025-10-19 20:03:34] [INFO] com.sanya.ChatServer - Starting ChatServer... 
+[2025-10-19 20:03:34] [INFO] com.sanya.ChatServer - Server listening on port 12345 
+[2025-10-19 20:03:44] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:51394 
+[2025-10-19 20:03:44] [INFO] com.sanya.ChatServer - [qwe] connected 
+[2025-10-19 20:03:44] [INFO] com.sanya.ChatServer - Received bundle from qwe 
+[2025-10-19 20:03:56] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:51411 
+[2025-10-19 20:03:56] [INFO] com.sanya.ChatServer - [xcxxv] connected 
+[2025-10-19 20:03:56] [INFO] com.sanya.ChatServer - Received bundle from xcxxv 
+[2025-10-19 20:04:04] [INFO] com.sanya.ChatServer - Client disconnected: xcxxv 
+[2025-10-19 20:04:04] [INFO] com.sanya.ChatServer - [xcxxv] disconnected 
+[2025-10-19 20:06:54] [INFO] com.sanya.ChatServer - Client disconnected: qwe 
+[2025-10-19 20:06:54] [INFO] com.sanya.ChatServer - [qwe] disconnected 

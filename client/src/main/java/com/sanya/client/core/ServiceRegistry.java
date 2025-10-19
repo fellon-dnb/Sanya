@@ -7,7 +7,7 @@ import com.sanya.client.ui.theme.ThemeManager;
 import com.sanya.events.core.EventBus;
 
 /**
- * Реестр всех сервисов клиента (chat, voice и т.д.)
+ * Реестр всех сервисов клиента
  */
 public final class ServiceRegistry {
 

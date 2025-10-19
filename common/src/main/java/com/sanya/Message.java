@@ -12,7 +12,7 @@ public class Message implements Serializable {
     private final String from;
     private final String text;
     private final Type type;
-
+     private Object attachment;
     public Message(String from, String text) {
         this(from, text, Type.USER);
     }
@@ -34,7 +34,13 @@ public class Message implements Serializable {
     public Type getType() {
         return type;
     }
+    public Object getAttachment() {
+        return attachment;
+    }
 
+    public void setAttachment(Object attachment) {
+        this.attachment = attachment;
+    }
     @Override
     public String toString() {
         if (type == Type.SYSTEM) {
