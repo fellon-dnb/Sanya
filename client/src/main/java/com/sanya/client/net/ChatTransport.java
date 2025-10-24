@@ -8,36 +8,66 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * ChatTransport — низкоуровневый TCP транспорт без бизнес-логики.
- * Отвечает за подключение, чтение и отправку объектов.
+ * ChatTransport — низкоуровневый TCP-транспорт для обмена сериализованными объектами.
+ * Не содержит бизнес-логики, работает только с сетевым вводом-выводом.
+ *
+ * Назначение:
+ *  - Управляет TCP-соединением (подключение, чтение, отправка, закрытие).
+ *  - Вызывает колбэки слушателя {@link TransportListener} при получении сообщений или ошибках.
+ *  - Используется классами верхнего уровня, например {@link ChatConnector}.
+ *
+ * Потокобезопасность:
+ *  - Отправка синхронизирована по потоку {@code out}.
+ *  - Состояние соединения защищено {@link AtomicBoolean connected}.
  */
 public class ChatTransport implements AutoCloseable {
 
     private static final Logger log = Logger.getLogger(ChatTransport.class.getName());
 
+    /** Адрес сервера */
     private final String host;
+
+    /** Порт сервера */
     private final int port;
 
+    /** TCP-сокет */
     private Socket socket;
+
+    /** Потоки ввода и вывода объектов */
     private ObjectInputStream in;
     private ObjectOutputStream out;
+
+    /** Фоновый поток чтения */
     private Thread readerThread;
+
+    /** Флаг состояния соединения */
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
+    /** Обработчик событий транспорта */
     private TransportListener listener;
 
+    /**
+     * Создаёт новый транспортный канал.
+     *
+     * @param host хост сервера
+     * @param port порт сервера
+     */
     public ChatTransport(String host, int port) {
         this.host = host;
         this.port = port;
         log.config("ChatTransport created for " + host + ":" + port);
     }
 
-    /** Установка слушателя событий (обработка входящих данных и ошибок). */
+    /** Назначает слушателя событий транспорта. */
     public void setListener(TransportListener listener) {
         this.listener = listener;
     }
 
-    /** Подключение к серверу. */
+    /**
+     * Подключается к серверу и запускает поток чтения.
+     *
+     * @throws IOException если не удалось установить соединение
+     */
     public synchronized void connect() throws IOException {
         if (connected.get()) {
             log.config("Already connected, skipping connect()");
@@ -62,7 +92,10 @@ public class ChatTransport implements AutoCloseable {
         log.info("Connected to " + host + ":" + port);
     }
 
-    /** Основной цикл чтения данных. */
+    /**
+     * Основной цикл чтения объектов из входящего потока.
+     * Вызывает слушатель для каждого полученного объекта.
+     */
     private void listenLoop() {
         try {
             while (connected.get() && !socket.isClosed()) {
@@ -80,7 +113,12 @@ public class ChatTransport implements AutoCloseable {
         }
     }
 
-    /** Отправка объекта на сервер. */
+    /**
+     * Отправляет сериализованный объект на сервер.
+     *
+     * @param obj объект для отправки
+     * @throws IOException если соединение разорвано или произошла ошибка записи
+     */
     public synchronized void send(Object obj) throws IOException {
         if (!connected.get() || out == null) {
             throw new IOException("Transport not connected");
@@ -92,12 +130,15 @@ public class ChatTransport implements AutoCloseable {
         }
     }
 
-    /** Проверка состояния. */
+    /** Проверяет активность соединения. */
     public boolean isConnected() {
         return connected.get();
     }
 
-    /** Безопасное закрытие. */
+    /**
+     * Безопасно закрывает все ресурсы.
+     * Соединение считается завершённым, listener уведомляется об отключении.
+     */
     @Override
     public synchronized void close() {
         if (!connected.getAndSet(false)) return;
@@ -115,9 +156,15 @@ public class ChatTransport implements AutoCloseable {
         log.config("ChatTransport closed cleanly");
     }
 
-    /** Интерфейс слушателя для обратных вызовов. */
+    /**
+     * Интерфейс слушателя транспорта.
+     * Используется для уведомления верхнего уровня о событиях приёма и отключения.
+     */
     public interface TransportListener {
+        /** Вызывается при получении нового объекта. */
         void onMessage(Object obj);
+
+        /** Вызывается при отключении или ошибке. */
         void onDisconnect(Exception cause);
     }
 }

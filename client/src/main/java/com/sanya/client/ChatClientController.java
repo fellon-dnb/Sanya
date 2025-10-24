@@ -1,6 +1,5 @@
 package com.sanya.client;
 
-import com.sanya.client.service.files.FileSender;
 import com.sanya.client.facade.UIFacade;
 import com.sanya.events.chat.MessageSendEvent;
 import com.sanya.events.system.SystemMessageEvent;
@@ -8,39 +7,51 @@ import com.sanya.events.system.SystemMessageEvent;
 import javax.swing.*;
 
 /**
- * Упрощенный контроллер - основная логика подписок вынесена в EventSubscriptionsManager.
- * Теперь отвечает только за специфичную UI логику и обработку команд.
+ * ChatClientController — контроллер верхнего уровня, отвечающий за логику взаимодействия
+ * между пользовательским интерфейсом и сервисами приложения.
+ *
+ * Назначение:
+ * - Обрабатывать пользовательские действия, инициированные из UI (отправка сообщений, запись голоса, передача файлов).
+ * - Делегировать бизнес-логику в сервисы, зарегистрированные в {@link ApplicationContext}.
+ * - Выполнять визуальные уведомления и обработку ошибок, не связанных с EventBus.
+ *
+ * Архитектура:
+ * Подписки на события вынесены в {@link com.sanya.client.core.EventSubscriptionsManager}.
+ * Контроллер фокусируется на командах и действиях, инициированных пользователем.
+ *
+ * Потоковая модель:
+ * Все операции, затрагивающие Swing-компоненты, выполняются через {@link SwingUtilities#invokeLater(Runnable)}.
  */
-public class ChatClientController {
+public final class ChatClientController {
 
+    /** Глобальный контекст приложения. */
     private final ApplicationContext context;
+
+    /** Фасад пользовательского интерфейса (для уведомлений и обновлений). */
     private final UIFacade ui;
 
+    /**
+     * Создаёт контроллер, привязанный к переданному контексту приложения.
+     *
+     * @param context экземпляр {@link ApplicationContext}, содержащий все сервисы клиента
+     */
     public ChatClientController(ApplicationContext context) {
         this.context = context;
         this.ui = context.getUIFacade();
-
         System.out.println("[ChatClientController] Controller initialized");
-        // Все подписки на события теперь управляются через EventSubscriptionsManager
-        // Этот класс может быть использован для UI-специфичной логики, не связанной с событиями
     }
 
     /**
-     * Отправка текстового сообщения
-     * Этот метод может вызываться из UI компонентов
+     * Отправляет текстовое сообщение через EventBus.
+     * Может вызываться напрямую из компонентов UI.
+     *
+     * @param text содержимое сообщения
      */
     public void sendMessage(String text) {
-        if (text == null || text.isBlank()) {
-            return;
-        }
+        if (text == null || text.isBlank()) return;
 
         try {
-            // Публикуем событие отправки сообщения
             context.getEventBus().publish(new MessageSendEvent(text));
-
-            // Локально добавляем сообщение в чат (дублирование убрано в EventSubscriptionsManager)
-            // ui.appendChatMessage("Я: " + text);
-
         } catch (Exception e) {
             SwingUtilities.invokeLater(() ->
                     ui.showError("Ошибка отправки сообщения: " + e.getMessage()));
@@ -48,7 +59,8 @@ public class ChatClientController {
     }
 
     /**
-     * Очистка чата
+     * Очищает окно чата.
+     * Делегирует вызов сервису {@link com.sanya.client.service.ChatService}.
      */
     public void clearChat() {
         try {
@@ -60,7 +72,8 @@ public class ChatClientController {
     }
 
     /**
-     * Запуск записи голосового сообщения
+     * Начинает запись голосового сообщения.
+     * Делегирует вызов сервису {@link com.sanya.client.service.audio.VoiceService}.
      */
     public void startVoiceRecording() {
         try {
@@ -72,7 +85,8 @@ public class ChatClientController {
     }
 
     /**
-     * Остановка записи голосового сообщения
+     * Завершает запись голосового сообщения.
+     * Делегирует вызов сервису {@link com.sanya.client.service.audio.VoiceService}.
      */
     public void stopVoiceRecording() {
         try {
@@ -84,12 +98,12 @@ public class ChatClientController {
     }
 
     /**
-     * Отправка файла
+     * Отправляет выбранный файл на сервер в отдельном потоке.
+     *
+     * @param file файл для передачи
      */
     public void sendFile(java.io.File file) {
-        if (file == null || !file.exists()) {
-            return;
-        }
+        if (file == null || !file.exists()) return;
 
         new Thread(() -> {
             try {
@@ -107,12 +121,14 @@ public class ChatClientController {
     }
 
     /**
-     * Выход из приложения
+     * Выполняет безопасное завершение работы приложения.
+     * Отписывает все события и корректно закрывает процесс.
      */
     public void exitApplication() {
         try {
-            if (context.getEventSubscriptionsManager() != null)
+            if (context.getEventSubscriptionsManager() != null) {
                 context.getEventSubscriptionsManager().unsubscribeAll();
+            }
 
             System.out.println("[ChatClientController] Application exit requested");
             System.exit(0);

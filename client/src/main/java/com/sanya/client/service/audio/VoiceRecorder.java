@@ -14,10 +14,21 @@ import java.util.logging.Logger;
 import static com.sanya.client.service.audio.AudioConfig.getFormat;
 
 /**
- * Захват звука с микрофона, публикация уровня сигнала (VU meter)
- * и события об окончании записи. С защитой от повторного запуска и лимитом по времени.
+ * VoiceRecorder — модуль записи голоса с микрофона.
+ * Публикует события уровня сигнала (VU meter) и завершения записи.
+ *
+ * Назначение:
+ *  - Захватывать аудиопоток с микрофона в формате PCM.
+ *  - Передавать уровень громкости для визуализации в UI.
+ *  - Отправлять готовые аудиоданные при остановке.
+ *  - Ограничивать продолжительность записи (по умолчанию 1 минута).
+ *
+ * Использование:
+ *  VoiceRecorder recorder = new VoiceRecorder(ctx);
+ *  recorder.start(); // начало записи
+ *  recorder.stop();  // завершение
  */
-public class VoiceRecorder implements Runnable {
+public final class VoiceRecorder implements Runnable {
 
     private static final Logger log = Logger.getLogger(VoiceRecorder.class.getName());
     private static final long MAX_DURATION_MS = 60000; // максимум 1 минута
@@ -31,7 +42,7 @@ public class VoiceRecorder implements Runnable {
         this.ctx = ctx;
     }
 
-    /** Запустить запись (игнорирует повторные вызовы) */
+    /** Запускает запись, предотвращая повторные вызовы. */
     public void start() {
         if (running.get()) {
             log.warning("[VoiceRecorder] Already running — ignored start");
@@ -43,14 +54,14 @@ public class VoiceRecorder implements Runnable {
         log.info("[VoiceRecorder] Recording thread started");
     }
 
-    /** Остановить запись */
+    /** Останавливает запись. */
     public void stop() {
         if (!running.get()) return;
         running.set(false);
         log.info("[VoiceRecorder] Stop requested");
     }
 
-    /** Проверка состояния */
+    /** Проверяет, активна ли запись. */
     public boolean isRunning() {
         return running.get();
     }
@@ -118,7 +129,13 @@ public class VoiceRecorder implements Runnable {
         }
     }
 
-    /** RMS (Root Mean Square) вычисление для визуализации громкости */
+    /**
+     * Вычисляет RMS (Root Mean Square) значение для оценки громкости.
+     *
+     * @param data буфер с PCM-данными
+     * @param len  количество байт для анализа
+     * @return нормализованный уровень громкости от 0.0 до 1.0
+     */
     private double calcRMS(byte[] data, int len) {
         long sum = 0;
         for (int i = 0; i < len - 1; i += 2) {

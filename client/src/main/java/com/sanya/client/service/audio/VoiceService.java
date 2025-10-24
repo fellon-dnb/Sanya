@@ -8,20 +8,36 @@ import com.sanya.events.voice.VoiceRecordingEvent;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class VoiceService {
+/**
+ * VoiceService — основной сервис для работы с голосовыми сообщениями.
+ * Управляет записью, воспроизведением и отправкой аудиоданных.
+ *
+ * Назначение:
+ *  - Контролировать жизненный цикл записи через {@link VoiceRecorder}.
+ *  - Воспроизводить локальные записи через {@link VoicePlayer}.
+ *  - Отправлять готовые голосовые сообщения на сервер.
+ *  - Предотвращать повторную отправку во время активной операции.
+ *
+ * Использование:
+ *  VoiceService voice = ctx.services().voice();
+ *  voice.startRecording();
+ *  voice.stopRecording();
+ *  voice.sendVoice(data);
+ */
+public final class VoiceService {
 
     private static final Logger log = Logger.getLogger(VoiceService.class.getName());
 
     private final ApplicationContext ctx;
     private VoiceRecorder recorder;
     private boolean recording;
-    private boolean sending; // защита от множественной отправки
+    private boolean sending;
 
     public VoiceService(ApplicationContext ctx) {
         this.ctx = ctx;
     }
 
-    /** Запустить запись, если она не активна */
+    /** Запускает запись с микрофона, если она ещё не активна. */
     public void startRecording() {
         if (recording) return;
 
@@ -38,7 +54,7 @@ public class VoiceService {
         log.fine("Voice recording started");
     }
 
-    /** Остановить запись */
+    /** Останавливает запись с микрофона. */
     public void stopRecording() {
         if (!recording) return;
         recording = false;
@@ -52,7 +68,7 @@ public class VoiceService {
         log.fine("Voice recording stopped");
     }
 
-    /** Воспроизвести временную запись (локально) */
+    /** Воспроизводит локально записанное голосовое сообщение. */
     public void playTemp(byte[] data) {
         new Thread(() -> {
             log.info("Playing temporary voice message");
@@ -60,7 +76,7 @@ public class VoiceService {
         }, "VoicePlayerTemp").start();
     }
 
-    /** Отправить голосовое сообщение на сервер */
+    /** Отправляет готовое голосовое сообщение через чат-сервис. */
     public void sendVoice(byte[] data) {
         if (sending) return;
         sending = true;
@@ -72,7 +88,7 @@ public class VoiceService {
         } catch (Exception e) {
             log.log(Level.SEVERE, "Failed to send voice message", e);
             ctx.getEventBus().publish(new SystemMessageEvent(
-                    "[ERROR] Отправка голосового сообщения: " + e.getMessage()
+                    "[ERROR] Ошибка при отправке голосового сообщения: " + e.getMessage()
             ));
         } finally {
             new Thread(() -> {
@@ -86,6 +102,7 @@ public class VoiceService {
         }
     }
 
+    /** Проверяет, выполняется ли сейчас отправка. */
     public boolean isSending() {
         return sending;
     }

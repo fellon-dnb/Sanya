@@ -108,3 +108,14 @@
 [2025-10-24 17:53:38] [INFO] com.sanya.ChatServer - [333] disconnected 
 [2025-10-24 17:53:39] [INFO] com.sanya.ChatServer - Client disconnected: 3434 
 [2025-10-24 17:53:39] [INFO] com.sanya.ChatServer - [3434] disconnected 
+[2025-10-24 18:13:43] [INFO] com.sanya.ChatServer - Server logging configuration loaded successfully 
+[2025-10-24 18:13:43] [INFO] com.sanya.ChatServer - Starting ChatServer... 
+[2025-10-24 18:13:43] [INFO] com.sanya.ChatServer - Server listening on port 12345 
+[2025-10-24 18:13:48] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:65443 
+[2025-10-24 18:13:48] [INFO] com.sanya.ChatServer - [22] connected 
+[2025-10-24 18:13:54] [INFO] com.sanya.ChatServer - Client connected: /127.0.0.1:65512 
+[2025-10-24 18:13:54] [INFO] com.sanya.ChatServer - [33] connected 
+[2025-10-24 18:15:15] [INFO] com.sanya.ChatServer - Client disconnected: 33 
+[2025-10-24 18:15:15] [INFO] com.sanya.ChatServer - [33] disconnected 
+[2025-10-24 18:15:17] [INFO] com.sanya.ChatServer - Client disconnected: 22 
+[2025-10-24 18:15:17] [INFO] com.sanya.ChatServer - [22] disconnected 

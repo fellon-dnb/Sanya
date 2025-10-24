@@ -29,28 +29,61 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * ChatConnector — реализация сетевого транспорта и обработчик событий клиента.
+ * Отвечает за соединение с сервером, обмен сообщениями, шифрование и реконнекты.
+ *
+ * Назначение:
+ *  - Инкапсулировать сетевую логику TCP-взаимодействия.
+ *  - Поддерживать E2EE (end-to-end encryption) через X25519 + AES-GCM.
+ *  - Обеспечить стабильное соединение с автопереподключением.
+ *
+ * Использование:
+ *  Создаётся в {@link ApplicationContext} и регистрируется как singleton.
+ *  Работает через {@link DefaultEventBus}, публикуя и слушая события.
+ */
 public final class ChatConnector implements AutoCloseable, Transport {
 
     private static final Logger log = Logger.getLogger(ChatConnector.class.getName());
 
+    /** Контекст приложения */
     private final ApplicationContext ctx;
+
+    /** Шина событий для публикации системных и пользовательских событий */
     private final DefaultEventBus bus;
+
+    /** Имя текущего пользователя */
     private final String username;
 
+    /** TCP-соединение и потоки */
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
 
+    /** Флаги и планировщик для реконнекта */
     private final AtomicBoolean reconnecting = new AtomicBoolean(false);
     private volatile boolean manualClose = false;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
+    /** Криптографические зависимости */
     private final KeyDirectory keyDir;
     private final Encryptor encryptor;
 
+    /** Параметры подключения */
     private final String host;
     private final int port;
 
+    /**
+     * Конструктор коннектора.
+     *
+     * @param ctx       контекст приложения
+     * @param host      адрес сервера
+     * @param port      порт сервера
+     * @param username  имя пользователя
+     * @param bus       локальный EventBus
+     * @param keyDir    хранилище ключей
+     * @param encryptor шифратор сообщений
+     */
     public ChatConnector(ApplicationContext ctx,
                          String host, int port,
                          String username,
@@ -67,6 +100,9 @@ public final class ChatConnector implements AutoCloseable, Transport {
         log.config("Initializing ChatConnector for user: " + username + " (" + host + ":" + port + ")");
     }
 
+    /**
+     * Устанавливает соединение с сервером и выполняет handshake.
+     */
     @Override
     public void connect() {
         log.config("Connecting to server...");
@@ -75,10 +111,12 @@ public final class ChatConnector implements AutoCloseable, Transport {
             out = new ObjectOutputStream(socket.getOutputStream());
             in = new ObjectInputStream(socket.getInputStream());
 
-            new Thread(this::listen).start();
+            new Thread(this::listen, "ChatConnector-Listener").start();
 
+            // Инициализационное сообщение
             send(new Message(username, "<<<HELLO>>>"));
 
+            // Отправка публичного ключа (X25519)
             String pubB64 = Crypto.encodePub(keyDir.myKeyPair().getPublic());
             send(new KeyHello(username, pubB64));
             log.info("Sent X25519 KeyHello for " + username);
@@ -91,6 +129,11 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }
     }
 
+    /**
+     * Отправляет произвольный объект в сеть.
+     *
+     * @param message объект для отправки
+     */
     @Override
     public void send(Object message) {
         try {
@@ -103,6 +146,10 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }
     }
 
+    /**
+     * Основной цикл приёма данных от сервера.
+     * Обрабатывает все входящие объекты.
+     */
     private void listen() {
         try {
             while (!socket.isClosed()) {
@@ -114,6 +161,11 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }
     }
 
+    /**
+     * Отправляет текстовое сообщение (с E2EE при наличии ключей).
+     *
+     * @param text сообщение пользователя
+     */
     public void sendMessage(String text) {
         if (text == null || text.isBlank()) return;
         try {
@@ -127,7 +179,6 @@ public final class ChatConnector implements AutoCloseable, Transport {
                 var dm = new EncryptedDirectMessage(username, to, enc.nonce(), enc.ct(),
                         "text/plain", null, null);
                 send(dm);
-
                 bus.publish(new MessageReceivedEvent(new Message(username, "[private] " + text)));
                 log.fine("Sent encrypted DM to " + to);
             } else {
@@ -138,17 +189,23 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }
     }
 
-
-
+    /**
+     * Упрощённая отправка объектов.
+     */
     public void sendObject(Object obj) {
         send(obj);
     }
 
+    /**
+     * Обработка входящих сообщений разных типов.
+     */
     private void onMessage(Object obj) {
         try {
             if (obj instanceof KeyDirectoryUpdate upd) {
                 upd.userToX25519PubB64().forEach((u, b64) -> {
-                    try { keyDir.putPub(u, Crypto.decodePub(b64)); } catch (Exception ignored) {}
+                    try {
+                        keyDir.putPub(u, Crypto.decodePub(b64));
+                    } catch (Exception ignored) {}
                 });
                 log.info("Updated key directory: " + upd.userToX25519PubB64().size());
                 return;
@@ -184,6 +241,9 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }
     }
 
+    /**
+     * Обработка разрыва соединения и автопереподключение.
+     */
     private void onDisconnect(Exception cause) {
         if (reconnecting.get()) return;
 
@@ -199,6 +259,9 @@ public final class ChatConnector implements AutoCloseable, Transport {
         scheduleReconnect(1);
     }
 
+    /**
+     * Планировщик реконнекта с экспоненциальной задержкой.
+     */
     private void scheduleReconnect(int attempt) {
         if (reconnecting.getAndSet(true)) return;
         int delay = Math.min(30, (int) Math.pow(2, attempt));
@@ -217,16 +280,27 @@ public final class ChatConnector implements AutoCloseable, Transport {
         }, delay, java.util.concurrent.TimeUnit.SECONDS);
     }
 
+    /**
+     * Обработка ошибок отправки.
+     */
     private void handleSendError(IOException e) {
         log.warning("Send failed: " + e.getMessage());
         bus.publish(new SystemMessageEvent("Send failed: " + e.getMessage()));
         onDisconnect(e);
     }
 
+    /**
+     * Проверяет состояние подключения.
+     *
+     * @return true, если соединение активно
+     */
     public boolean isConnected() {
         return socket != null && socket.isConnected() && !socket.isClosed();
     }
 
+    /**
+     * Закрывает соединение и завершает планировщик реконнекта.
+     */
     @Override
     public void close() {
         manualClose = true;
