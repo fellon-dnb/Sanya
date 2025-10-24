@@ -133,3 +133,14 @@
 [2025-10-24 17:53:01] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
 [2025-10-24 17:53:11] [WARNING] com.sanya.client.net.ChatConnector - Error processing message 
 [2025-10-24 17:53:38] [INFO] com.sanya.client.Application - Shutdown hook executed 
+[2025-10-24 18:13:46] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 18:13:46] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 18:13:48] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 22 (localhost:12345) 
+[2025-10-24 18:13:48] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 18:13:48] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 18:13:48] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 18:13:48] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 18:13:48] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for 22 
+[2025-10-24 18:13:48] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 18:13:54] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 18:15:17] [INFO] com.sanya.client.Application - Shutdown hook executed 

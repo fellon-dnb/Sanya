@@ -4,33 +4,54 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Минималистичные уведомления в стиле REPL / терминала — всегда поверх всех окон.
+ * NotificationManager — утилита для отображения ненавязчивых уведомлений (toast-сообщений)
+ * поверх всех окон приложения. Используется для системных, информационных и
+ * ошибочных уведомлений в минималистичном стиле.
+ *
+ * Назначение:
+ * - Отображение временных сообщений пользователю без блокировки интерфейса.
+ * - Автоматическое исчезновение уведомления через заданный интервал (по умолчанию 3 секунды).
+ * - Сохранение минималистичного вида, напоминающего консоль или REPL.
+ *
+ * Визуальные характеристики:
+ * - Окно без рамок, всегда поверх других окон.
+ * - Закруглённые углы, мягкая тень, прозрачный фон.
+ * - Расположение в правом нижнем углу экрана.
+ *
+ * Пример:
+ * NotificationManager.showInfo("Message sent");
+ * NotificationManager.showError("Connection failed");
  */
-public class NotificationManager {
+public final class NotificationManager {
 
+    private NotificationManager() {
+    }
+
+    /**
+     * Отображает toast-сообщение с указанными параметрами.
+     *
+     * @param message    текст уведомления
+     * @param background цвет фона панели уведомления
+     * @param textColor  цвет текста
+     */
     public static void showToast(String message, Color background, Color textColor) {
         SwingUtilities.invokeLater(() -> {
-            // Окно уведомления
             JWindow toast = new JWindow();
             toast.setAlwaysOnTop(true);
             toast.setFocusableWindowState(false);
-            toast.setBackground(new Color(0, 0, 0, 0)); // прозрачный фон для окна
+            toast.setBackground(new Color(0, 0, 0, 0));
 
-            // Контейнер с закруглёнными углами и тенью
             JPanel panel = new JPanel() {
                 @Override
                 protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                     int arc = 20;
                     g2.setColor(background);
                     g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
 
-                    // Лёгкая тень
                     g2.setColor(new Color(0, 0, 0, 60));
                     g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-
                     g2.dispose();
                 }
             };
@@ -40,13 +61,12 @@ public class NotificationManager {
 
             JLabel label = new JLabel(message);
             label.setForeground(textColor);
-            label.setFont(new Font("Segoe UI", Font.PLAIN, 12)); //  читаемый системный шрифт
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
             panel.add(label);
 
             toast.add(panel);
             toast.pack();
 
-            // позиция — правый нижний угол экрана
             Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
             int x = screen.width - toast.getWidth() - 40;
             int y = screen.height - toast.getHeight() - 80;
@@ -54,19 +74,33 @@ public class NotificationManager {
 
             toast.setVisible(true);
 
-            // Таймер скрытия
             new Timer(3000, e -> toast.dispose()).start();
         });
     }
 
+    /**
+     * Отображает информационное уведомление.
+     *
+     * @param message текст уведомления
+     */
     public static void showInfo(String message) {
         showToast("[INFO] " + message, new Color(45, 45, 45), Color.WHITE);
     }
 
+    /**
+     * Отображает предупреждение.
+     *
+     * @param message текст уведомления
+     */
     public static void showWarning(String message) {
         showToast("[WARN] " + message, new Color(120, 80, 0), Color.WHITE);
     }
 
+    /**
+     * Отображает уведомление об ошибке.
+     *
+     * @param message текст уведомления
+     */
     public static void showError(String message) {
         showToast("[ERROR] " + message, new Color(219, 15, 15), Color.WHITE);
     }

@@ -1,23 +1,16 @@
 package com.sanya.client.core;
 
 import com.sanya.client.ApplicationContext;
-
 import com.sanya.client.net.ChatConnector;
 import com.sanya.client.facade.UIFacade;
 import com.sanya.client.ui.dialog.ChatVoiceDialog;
-import com.sanya.events.chat.MessageReceivedEvent;
-import com.sanya.events.chat.MessageSendEvent;
-import com.sanya.events.chat.UserDisconnectedEvent;
-import com.sanya.events.chat.UserListUpdatedEvent;
+import com.sanya.events.chat.*;
 import com.sanya.events.core.EventHandler;
 import com.sanya.events.file.FileIncomingEvent;
 import com.sanya.events.system.SystemMessageEvent;
 import com.sanya.events.system.ThemeChangedEvent;
 import com.sanya.events.ui.ClearChatEvent;
-import com.sanya.events.voice.VoiceLevelEvent;
-import com.sanya.events.voice.VoiceMessageReadyEvent;
-import com.sanya.events.voice.VoiceRecordingEvent;
-import com.sanya.events.voice.VoiceRecordingStoppedEvent;
+import com.sanya.events.voice.*;
 import com.sanya.files.FileTransferEvent;
 
 import javax.swing.*;
@@ -26,18 +19,44 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Централизованный менеджер подписок на события.
- * Управляет всеми подписками в приложении, что упрощает отладку и предотвращает утечки памяти.
+ * EventSubscriptionsManager — централизованный менеджер подписок на события.
+ * Управляет регистрацией, хранением и очисткой всех обработчиков событий приложения.
+ *
+ * Назначение:
+ *  - Упрощает отладку и контроль жизненного цикла событий.
+ *  - Исключает дублирование логики подписок в разных модулях.
+ *  - Гарантирует корректную отписку при завершении работы клиента.
+ *
+ * Использование:
+ *  Создаётся в ApplicationContext, регистрирует все нужные события при старте клиента.
+ *  Позволяет безопасно вызывать {@link #unsubscribeAll()} при выходе.
  */
 public class EventSubscriptionsManager {
+
     private static final Logger log = Logger.getLogger(EventSubscriptionsManager.class.getName());
+
+    /** Контекст приложения */
     private final ApplicationContext context;
+
+    /** Интерфейс взаимодействия с UI */
     private final UIFacade ui;
+
+    /** Сетевой коннектор */
     private final ChatConnector connector;
+
+    /** Зарегистрированные подписки */
     private final List<Subscription> subscriptions;
 
+    /** Активный диалог отправки голосового сообщения */
     private ChatVoiceDialog currentVoiceDialog;
 
+    /**
+     * Конструктор менеджера подписок.
+     *
+     * @param context   контекст приложения
+     * @param ui        фасад пользовательского интерфейса
+     * @param connector сетевой коннектор
+     */
     public EventSubscriptionsManager(ApplicationContext context, UIFacade ui, ChatConnector connector) {
         this.context = context;
         this.ui = ui;
@@ -46,35 +65,37 @@ public class EventSubscriptionsManager {
     }
 
     /**
-     * Регистрирует все подписки
+     * Регистрирует все стандартные подписки приложения.
      */
     public void registerAllSubscriptions() {
-        log.info("Registering voice subscriptions, total so far: " + subscriptions.size());
+        log.info("Registering all event subscriptions...");
         registerMessageSubscriptions();
         registerUserListSubscriptions();
         registerVoiceSubscriptions();
         registerFileTransferSubscriptions();
         registerThemeSubscriptions();
-
-        log.info("Registered " + subscriptions.size() + " event subscriptions");
+        log.info("Total subscriptions registered: " + subscriptions.size());
     }
 
-
+    /**
+     * Отписывает все ранее зарегистрированные события.
+     */
     public void unsubscribeAll() {
         subscriptions.forEach(Subscription::unsubscribe);
         subscriptions.clear();
-        log.info("Unsubscribed all events");
+        log.info("All event subscriptions removed");
     }
 
+    /** === Подписки на сообщения === */
     private void registerMessageSubscriptions() {
-        // Подписка на отправку сообщений (из UI в сеть)
+        // Отправка сообщений (UI -> сеть)
         subscribe(MessageSendEvent.class, e -> {
             if (connector != null) {
                 connector.sendMessage(e.text());
             }
         });
 
-        // Подписка на получение сообщений (из сети в UI)
+        // Получение сообщений (сеть -> UI)
         subscribe(MessageReceivedEvent.class, e -> {
             String self = context.getUserSettings().getName();
             SwingUtilities.invokeLater(() -> {
@@ -87,10 +108,10 @@ public class EventSubscriptionsManager {
         });
 
         // Очистка чата
-        subscribe(ClearChatEvent.class, e ->
-                SwingUtilities.invokeLater(ui::clearChat));
+        subscribe(ClearChatEvent.class, e -> SwingUtilities.invokeLater(ui::clearChat));
     }
 
+    /** === Подписки на пользователей === */
     private void registerUserListSubscriptions() {
         subscribe(UserListUpdatedEvent.class, e ->
                 SwingUtilities.invokeLater(() -> ui.updateUserList(e.usernames())));
@@ -99,34 +120,32 @@ public class EventSubscriptionsManager {
                 log.info("User disconnected: " + e.username()));
     }
 
+    /** === Подписки на голосовые события === */
     private void registerVoiceSubscriptions() {
-        // Голосовые сообщения от других пользователей
+        // Голосовые сообщения
         subscribe(VoiceMessageReadyEvent.class, e -> {
             if (!e.recipient().equals(context.getUserSettings().getName())) {
                 SwingUtilities.invokeLater(() -> ui.showVoiceMessage(e.recipient(), e.data()));
             }
         });
 
-        // Диалог после остановки записи (только для текущего пользователя)
+        // Диалог отправки после остановки записи
         subscribe(VoiceRecordingStoppedEvent.class, e -> {
-            if (!e.username().equals(context.getUserSettings().getName())) {
-                return;
+            if (e.username().equals(context.getUserSettings().getName())) {
+                SwingUtilities.invokeLater(() -> openVoiceDialog(e.data()));
             }
-
-            SwingUtilities.invokeLater(() -> openVoiceDialog(e.data()));
         });
 
-        // Статус записи голоса
+        // Изменение статуса записи
         subscribe(VoiceRecordingEvent.class, e ->
-                SwingUtilities.invokeLater(() ->
-                        ui.showVoiceRecordingStatus(e.started())));
+                SwingUtilities.invokeLater(() -> ui.showVoiceRecordingStatus(e.started())));
 
-        // Уровень громкости при записи
+        // Обновление уровня громкости
         subscribe(VoiceLevelEvent.class, e ->
-                SwingUtilities.invokeLater(() ->
-                        updateVoiceLevel(e.level())));
+                SwingUtilities.invokeLater(() -> updateVoiceLevel(e.level())));
     }
 
+    /** === Подписки на события передачи файлов === */
     private void registerFileTransferSubscriptions() {
         subscribe(FileTransferEvent.class, e -> {
             switch (e.type()) {
@@ -144,6 +163,7 @@ public class EventSubscriptionsManager {
                 log.info("File incoming: " + e.request()));
     }
 
+    /** === Подписки на системные и UI события === */
     private void registerThemeSubscriptions() {
         subscribe(ThemeChangedEvent.class, e ->
                 SwingUtilities.invokeLater(() -> ui.applyTheme(e.theme())));
@@ -152,38 +172,36 @@ public class EventSubscriptionsManager {
                 SwingUtilities.invokeLater(() -> ui.showError(e.message())));
     }
 
+    /**
+     * Открывает диалог для подтверждения отправки голосового сообщения.
+     */
     private void openVoiceDialog(byte[] data) {
-        // Закрываем предыдущий диалог, если есть
         if (currentVoiceDialog != null && currentVoiceDialog.isVisible()) {
             currentVoiceDialog.dispose();
         }
 
-        // Создаем новый диалог
-        currentVoiceDialog = new ChatVoiceDialog(
-                null,
-                data,
-                context.services().voice()
-        );
-
-        // Настраиваем слушатель закрытия
+        currentVoiceDialog = new ChatVoiceDialog(null, data, context.services().voice());
         currentVoiceDialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent e) {
                 currentVoiceDialog = null;
             }
         });
-
         currentVoiceDialog.setVisible(true);
     }
 
+    /**
+     * Обновляет уровень громкости во время записи.
+     *
+     * @param level значение громкости от 0 до 1
+     */
     private void updateVoiceLevel(double level) {
-        // Эта логика может быть перенесена в UI, оставляем здесь для примера
         int percent = (int) (level * 100);
         log.fine("Voice recording level: " + percent + "%");
     }
 
     /**
-     * Вспомогательный метод для подписки с автоматическим управлением жизненным циклом
+     * Унифицированная регистрация подписчиков с отслеживанием.
      */
     private <E> void subscribe(Class<E> eventType, EventHandler<E> handler) {
         context.getEventBus().subscribe(eventType, handler);
@@ -191,7 +209,7 @@ public class EventSubscriptionsManager {
     }
 
     /**
-     * Внутренний класс для отслеживания подписок
+     * Вспомогательный класс для хранения данных о подписке.
      */
     private static class Subscription {
         private final Class<?> eventType;
@@ -202,10 +220,13 @@ public class EventSubscriptionsManager {
             this.handler = handler;
         }
 
+        /**
+         * Заглушка для возможной будущей реализации отписки.
+         * В текущей версии EventBus не предоставляет обратной ссылки.
+         */
         @SuppressWarnings("unchecked")
         public void unsubscribe() {
-            // Для отписки нам нужен EventBus, но он не хранится здесь
-            // Реализуем отписку через ApplicationContext при необходимости
+            // Можно реализовать отписку через EventBus при его расширении.
         }
     }
 }

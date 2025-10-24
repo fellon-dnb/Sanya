@@ -18,37 +18,60 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
- * Точка входа клиента чата.
- * Настраивает контекст, GUI и сетевое подключение.
+ * Application — точка входа клиентского приложения Sanya Chat.
+ * Отвечает за инициализацию контекста, сервисов, GUI и сетевого взаимодействия.
+ *
+ * Назначение:
+ * - Настроить среду клиента (DI, EventBus, шифрование, UI, соединение).
+ * - Запустить основной цикл приложения и отреагировать на сетевые события.
+ *
+ * Архитектура запуска:
+ * 1. Чтение аргументов командной строки.
+ * 2. Инициализация контекста и криптографии.
+ * 3. Создание UI и регистрация сервисов.
+ * 4. Подключение к серверу через {@link ChatConnector}.
+ * 5. Управление событиями через {@link EventSubscriptionsManager}.
+ * 6. Безопасное завершение с очисткой ресурсов.
+ *
+ * Пример запуска:
+ * java -jar sanya-client.jar --host localhost --port 12345 --username Alice
  */
-public class Application {
+public final class Application {
 
     private static final Logger log = Logger.getLogger(Application.class.getName());
 
+    /**
+     * Точка старта клиента. Инициализирует компоненты и запускает UI.
+     *
+     * @param args аргументы командной строки, поддерживает:
+     *             --host, -h (адрес сервера),
+     *             --port, -p (порт),
+     *             --username, -u (имя пользователя)
+     */
     public void start(Arguments args) {
-        // === Настройка сети ===
+        // Настройка сети
         NetworkSettings networkSettings = new NetworkSettings(
                 args.get(String.class, new String[]{"--host", "-h"}, "localhost"),
                 args.get(Integer.class, new String[]{"--port", "-p"}, 12345)
         );
 
-        // === Имя пользователя из CLI ===
+        // Имя пользователя
         String usernameFromCli = args.get(String.class, new String[]{"--username", "-u"}, "");
 
-        // === Контекст приложения ===
+        // Создание контекста
         ApplicationContext ctx = new ApplicationContext(networkSettings);
 
-        // === Инициализация криптографии ===
+        // Инициализация криптографии
         var keyDir = new KeyDirectory();
         var encryptor = new Encryptor(keyDir);
 
-        // Регистрируем в DI
         ctx.di().registerSingleton(KeyDirectory.class, () -> keyDir);
         ctx.di().registerSingleton(Encryptor.class, () -> encryptor);
 
-        // === UI и запуск ===
+        // Запуск UI в EDT
         SwingUtilities.invokeLater(() -> {
             try {
+                // Имя пользователя
                 String username = usernameFromCli.isEmpty()
                         ? JOptionPane.showInputDialog("Enter your Name:")
                         : usernameFromCli;
@@ -56,11 +79,12 @@ public class Application {
                 if (username == null || username.isBlank()) username = "Anonymous";
                 ctx.getUserSettings().setName(username);
 
+                // Инициализация UI
                 ChatClientUI ui = new ChatClientUI(ctx);
                 UIFacade facade = new SwingUIFacade(ctx, ui.getMainPanel());
                 ctx.setUIFacade(facade);
 
-                // === Создаём ChatConnector с поддержкой шифрования ===
+                // Создание сетевого коннектора
                 ChatConnector connector = new ChatConnector(
                         ctx,
                         networkSettings.getHost(),
@@ -70,32 +94,30 @@ public class Application {
                         keyDir,
                         encryptor
                 );
-
-                // Регистрируем коннектор
                 ctx.di().registerSingleton(ChatConnector.class, () -> connector);
 
-                // Подключаем ChatService к коннектору
+                // Подключение чата к транспортному уровню
                 ctx.services().chat().attachOutputSupplier(connector::isConnected, connector::sendObject);
 
-                // === Подписки ===
+                // Регистрация подписок на события
                 EventSubscriptionsManager subscriptionsManager = new EventSubscriptionsManager(ctx, facade, connector);
                 ctx.setEventSubscriptionsManager(subscriptionsManager);
                 subscriptionsManager.registerAllSubscriptions();
 
-                // === Реакция на потерю соединения ===
+                // Реакция на потерю соединения
                 ctx.getEventBus().subscribe(ConnectionLostEvent.class, e ->
                         ctx.getUIFacade().showWarning("[NETWORK] " + e.reason() +
                                 (e.willReconnect() ? " (reconnecting...)" : "")));
 
-                // === Контроллер UI ===
+                // Контроллер UI
                 new ChatClientController(ctx);
 
-                // === Запуск соединения ===
+                // Подключение к серверу
                 connector.connect();
 
                 ui.setVisible(true);
 
-                // === Завершение работы ===
+                // Безопасное завершение
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     log.info("Shutdown hook executed");
                     if (ctx.getEventSubscriptionsManager() != null)
@@ -114,8 +136,12 @@ public class Application {
         });
     }
 
+    /**
+     * Главная точка входа программы.
+     * Выполняет настройку логирования и инициализирует запуск клиента.
+     */
     public static void main(String[] args) {
-        // === Настройка логгера ===
+        // Настройка логгера
         try {
             java.nio.file.Files.createDirectories(java.nio.file.Path.of("logs"));
             try (InputStream input = Application.class.getResourceAsStream("/logging.properties")) {
@@ -130,7 +156,7 @@ public class Application {
             System.err.println("[WARN] Failed to initialize logging: " + e.getMessage());
         }
 
-        // === Запуск приложения ===
+        // Запуск приложения
         try {
             new Application().start(Arguments.parse(args));
         } catch (Exception e) {
