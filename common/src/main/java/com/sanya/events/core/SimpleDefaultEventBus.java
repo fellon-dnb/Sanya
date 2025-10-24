@@ -5,13 +5,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import com.sanya.events.core.EventBus;
+
 /**
  * Потокобезопасная реализация EventBus с поддержкой иерархии событий и логированием.
  */
-public class SimpleEventBus implements EventBus {
+public class SimpleDefaultEventBus implements DefaultEventBus {
 
-    private static final Logger log = Logger.getLogger(SimpleEventBus.class.getName());
+    private static final Logger log = Logger.getLogger(SimpleDefaultEventBus.class.getName());
 
     // Хранилище подписчиков: тип события -> список обработчиков
     private final Map<Class<?>, List<EventHandler<?>>> subscribers = new ConcurrentHashMap<>();

@@ -1,7 +1,8 @@
 package com.sanya.client.service;
 
+import com.sanya.client.core.api.EventBus;
 import com.sanya.events.chat.MessageSendEvent;
-import com.sanya.events.core.EventBus;
+import com.sanya.events.core.DefaultEventBus;
 import com.sanya.events.system.SystemMessageEvent;
 import com.sanya.events.ui.ClearChatEvent;
 
@@ -9,7 +10,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import com.sanya.messages.VoiceMessage;
 /**
  * ChatService управляет взаимодействием чата через EventBus.
  * Работает с любым транспортом, переданным через attachOutputSupplier().
@@ -57,13 +58,25 @@ public class ChatService {
         try {
             objectSender.accept(obj);
             log.fine("Object sent: " + obj.getClass().getSimpleName());
+
+            // отразить отправленное приватное сообщение в UI
+            if (obj instanceof com.sanya.crypto.msg.EncryptedDirectMessage dm) {
+                var m = new com.sanya.Message(dm.from(), "[private] " + "[you]"); // или текст, если его знаешь
+                bus.publish(new com.sanya.events.chat.MessageReceivedEvent(m));
+            }
+
         } catch (Exception e) {
             log.log(Level.SEVERE, "Send failed", e);
             bus.publish(new SystemMessageEvent("[ERROR] Send failed: " + e.getMessage()));
         }
     }
 
+
     public EventBus getBus() {
         return bus;
     }
+    public void sendVoiceMessage(byte[] data, String recipient) {
+        sendObject(new VoiceMessage(recipient , data));
+    }
+
 }

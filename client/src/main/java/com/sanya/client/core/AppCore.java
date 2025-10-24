@@ -1,23 +1,28 @@
 package com.sanya.client.core;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.events.core.EventBus;
+import com.sanya.client.core.api.EventBus;
+import com.sanya.client.service.ChatEventBus;
+import com.sanya.client.service.audio.VoiceSender;
+import com.sanya.client.service.files.FileSender;
+import com.sanya.client.ui.theme.ThemeManager;
+import com.sanya.events.core.DefaultEventBus;
 
-/**
- * AppCore — ядро DI и базовой инфраструктуры (EventBus, ServiceRegistry)
- */
 public final class AppCore {
 
     private final DependencyContainer di = new DependencyContainer();
-    private final EventBus eventBus;
+    private final DefaultEventBus rawBus;
+    private final EventBus bus;
     private final ServiceRegistry services;
 
     public AppCore(ApplicationContext ctx) {
-        this.eventBus = ctx.getEventBus();
-        services = new ServiceRegistry(ctx, eventBus);
+        this.rawBus = ctx.getEventBus();
+        this.bus = new ChatEventBus(rawBus);
+        this.services = new ServiceRegistry(ctx, bus);
         di.registerSingleton(ServiceRegistry.class, () -> services);
     }
 
-    public EventBus eventBus() { return eventBus; }
+    public EventBus eventBus() { return bus; }
+
     public ServiceRegistry services() { return services; }
 }

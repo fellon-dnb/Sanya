@@ -1,9 +1,7 @@
 package com.sanya;
 
 import com.sanya.events.chat.UserListUpdatedEvent;
-import com.sanya.events.voice.VoiceMessageReadyEvent;
-import com.sanya.events.voice.VoicePlayEvent;
-import com.sanya.events.voice.VoiceRecordingEvent;
+
 import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferRequest;
 
@@ -20,6 +18,9 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import com.sanya.crypto.SignedPreKeyBundle;
+import com.sanya.server.store.InMemoryMessageStore;
+import com.sanya.server.store.MessageStore;
+
 /**
  * Центральный сервер чата Sanya.
  * Поддерживает обмен сообщениями, файлами и голосовыми событиями.
@@ -35,7 +36,7 @@ public class ChatServer {
     private static final Map<String, SignedPreKeyBundle> signedBundles = new ConcurrentHashMap<>();
     private static final Map<String, ObjectOutputStream> userOut = new ConcurrentHashMap<>();
     private static final Map<String, String> userPubB64 = new ConcurrentHashMap<>();
-
+    private final MessageStore messageStore = new InMemoryMessageStore();
     // === Точка входа ===
     public static void main(String[] args) {
         try {
@@ -118,7 +119,7 @@ public class ChatServer {
     }
 
     // === Обработка клиента ===
-    private static class ClientHandler implements Runnable {
+    private  class ClientHandler implements Runnable {
         private final Socket socket;
         private String clientName;
         private ObjectOutputStream out;
@@ -140,6 +141,11 @@ public class ChatServer {
                 clients.put(out, clientName);
                 userOut.put(clientName, out);
                 log.info("[" + clientName + "] connected");
+
+                for (Object msg : messageStore.retrieve(clientName)) {
+                    out.writeObject(msg);
+                    out.flush();
+                }
 
 
                 // Оповещаем остальных
@@ -190,7 +196,7 @@ public class ChatServer {
                     }
 
                     if (obj instanceof com.sanya.events.voice.VoiceMessageReadyEvent v) {
-                        broadcastExcept(out, v);
+                        broadcast( v);
                         continue;
                     }
 
@@ -205,25 +211,22 @@ public class ChatServer {
                     }
                     else if (obj instanceof com.sanya.crypto.msg.EncryptedDirectMessage dm) {
                         ObjectOutputStream dst = userOut.get(dm.to());
+                        ObjectOutputStream self = userOut.get(dm.from());
                         if (dst != null) {
                             try {
                                 dst.writeObject(dm);
                                 dst.flush();
                             } catch (IOException ignore) {}
+                        } else {
+                            messageStore.save(dm.to(), dm);
+                        }
+                        if (self != null && self != dst) {
+                            try {
+                                self.writeObject(dm);
+                                self.flush();
+                            } catch (IOException ignore) {}
                         }
                     }
-                    else if (obj instanceof com.sanya.crypto.msg.KeyHello hk) {
-                        userPubB64.put(hk.username(), hk.x25519PublicKeyB64());
-                        var snap = new com.sanya.crypto.msg.KeyDirectoryUpdate(Map.copyOf(userPubB64));
-                        broadcast(snap);
-                    }
-                    else if (obj instanceof com.sanya.crypto.msg.EncryptedDirectMessage dm) {
-                        ObjectOutputStream dst = userOut.get(dm.to());
-                        if (dst != null) {
-                            try { dst.writeObject(dm); dst.flush(); } catch (IOException ignore) {}
-                        }
-                    }
-
 
                     // Неизвестный тип
                     log.fine("Unknown object: " + obj.getClass().getName());

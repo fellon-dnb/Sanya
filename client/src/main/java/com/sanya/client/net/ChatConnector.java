@@ -2,6 +2,7 @@ package com.sanya.client.net;
 
 import com.sanya.Message;
 import com.sanya.client.ApplicationContext;
+import com.sanya.client.core.api.Transport;
 import com.sanya.client.security.Encryptor;
 import com.sanya.client.security.KeyDirectory;
 import com.sanya.crypto.Crypto;
@@ -10,7 +11,7 @@ import com.sanya.crypto.msg.KeyDirectoryUpdate;
 import com.sanya.crypto.msg.KeyHello;
 import com.sanya.events.chat.MessageReceivedEvent;
 import com.sanya.events.chat.UserListUpdatedEvent;
-import com.sanya.events.core.EventBus;
+import com.sanya.events.core.DefaultEventBus;
 import com.sanya.events.file.FileChunkEvent;
 import com.sanya.events.file.FileIncomingEvent;
 import com.sanya.events.system.ConnectionLostEvent;
@@ -20,45 +21,45 @@ import com.sanya.events.voice.VoiceMessageReadyEvent;
 import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferRequest;
 
-import java.io.IOException;
-import java.util.Map;
+import java.io.*;
+import java.net.Socket;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * ChatConnector — интеграция EventBus <-> ChatTransport.
- * Поддерживает reconnection, старый PreKey-протокол и новое E2EE (X25519 + AES-GCM).
- */
-public final class ChatConnector implements ChatTransport.TransportListener, AutoCloseable {
+public final class ChatConnector implements AutoCloseable, Transport {
 
     private static final Logger log = Logger.getLogger(ChatConnector.class.getName());
 
     private final ApplicationContext ctx;
-    private final ChatTransport transport;
-    private final EventBus bus;
+    private final DefaultEventBus bus;
     private final String username;
 
-    // Реконнект
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
+
     private final AtomicBoolean reconnecting = new AtomicBoolean(false);
     private volatile boolean manualClose = false;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-    // Новое E2EE
     private final KeyDirectory keyDir;
     private final Encryptor encryptor;
+
+    private final String host;
+    private final int port;
 
     public ChatConnector(ApplicationContext ctx,
                          String host, int port,
                          String username,
-                         EventBus bus,
+                         DefaultEventBus bus,
                          KeyDirectory keyDir,
                          Encryptor encryptor) {
         this.ctx = ctx;
-        this.transport = new ChatTransport(host, port);
-        this.transport.setListener(this);
+        this.host = host;
+        this.port = port;
         this.bus = bus;
         this.username = username;
         this.keyDir = keyDir;
@@ -66,16 +67,20 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
         log.config("Initializing ChatConnector for user: " + username + " (" + host + ":" + port + ")");
     }
 
-    /** === Подключение к серверу === */
+    @Override
     public void connect() {
         log.config("Connecting to server...");
         try {
-            transport.connect();
-            transport.send(new Message(username, "<<<HELLO>>>"));
+            socket = new Socket(host, port);
+            out = new ObjectOutputStream(socket.getOutputStream());
+            in = new ObjectInputStream(socket.getInputStream());
 
-            // --- Новый E2EE handshake ---
+            new Thread(this::listen).start();
+
+            send(new Message(username, "<<<HELLO>>>"));
+
             String pubB64 = Crypto.encodePub(keyDir.myKeyPair().getPublic());
-            transport.send(new KeyHello(username, pubB64));
+            send(new KeyHello(username, pubB64));
             log.info("Sent X25519 KeyHello for " + username);
 
             bus.publish(new SystemInfoEvent("Connected to server"));
@@ -86,7 +91,29 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
         }
     }
 
-    /** === Отправка простого текста (E2EE при наличии получателя) === */
+    @Override
+    public void send(Object message) {
+        try {
+            synchronized (out) {
+                out.writeObject(message);
+                out.flush();
+            }
+        } catch (IOException e) {
+            handleSendError(e);
+        }
+    }
+
+    private void listen() {
+        try {
+            while (!socket.isClosed()) {
+                Object obj = in.readObject();
+                onMessage(obj);
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            if (!manualClose) onDisconnect(e);
+        }
+    }
+
     public void sendMessage(String text) {
         if (text == null || text.isBlank()) return;
         try {
@@ -99,32 +126,26 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
                 var enc = encryptor.encryptFor(to, text.getBytes());
                 var dm = new EncryptedDirectMessage(username, to, enc.nonce(), enc.ct(),
                         "text/plain", null, null);
-                transport.send(dm);
+                send(dm);
+
+                bus.publish(new MessageReceivedEvent(new Message(username, "[private] " + text)));
                 log.fine("Sent encrypted DM to " + to);
             } else {
-                transport.send(new Message(username, text));
+                send(new Message(username, text));
             }
-        } catch (IOException e) {
-            handleSendError(e);
         } catch (Exception e) {
             log.log(Level.WARNING, "Encryption failed", e);
         }
     }
 
-    /** === Отправка произвольного объекта === */
+
+
     public void sendObject(Object obj) {
-        try {
-            transport.send(obj);
-        } catch (IOException e) {
-            handleSendError(e);
-        }
+        send(obj);
     }
 
-    /** === Обработка входящих сообщений === */
-    @Override
-    public void onMessage(Object obj) {
+    private void onMessage(Object obj) {
         try {
-            // --- Обновление каталога ключей ---
             if (obj instanceof KeyDirectoryUpdate upd) {
                 upd.userToX25519PubB64().forEach((u, b64) -> {
                     try { keyDir.putPub(u, Crypto.decodePub(b64)); } catch (Exception ignored) {}
@@ -133,7 +154,6 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
                 return;
             }
 
-            // --- Зашифрованные личные сообщения ---
             if (obj instanceof EncryptedDirectMessage dm) {
                 byte[] plain = encryptor.decryptFrom(dm.from(), dm.nonce12(), dm.ciphertext());
                 String text = new String(plain);
@@ -142,7 +162,6 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
                 return;
             }
 
-            // --- Обычные объекты чата ---
             if (obj instanceof Message message) {
                 if (!"<<<HELLO>>>".equals(message.getText()))
                     bus.publish(new MessageReceivedEvent(message));
@@ -165,9 +184,7 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
         }
     }
 
-    /** === Потеря соединения и авто-реконнект === */
-    @Override
-    public void onDisconnect(Exception cause) {
+    private void onDisconnect(Exception cause) {
         if (reconnecting.get()) return;
 
         String reason = cause != null ? cause.getMessage() : "Connection closed";
@@ -200,23 +217,22 @@ public final class ChatConnector implements ChatTransport.TransportListener, Aut
         }, delay, java.util.concurrent.TimeUnit.SECONDS);
     }
 
-    /** === Ошибка отправки === */
     private void handleSendError(IOException e) {
         log.warning("Send failed: " + e.getMessage());
         bus.publish(new SystemMessageEvent("Send failed: " + e.getMessage()));
         onDisconnect(e);
     }
 
-    /** === Состояние соединения === */
     public boolean isConnected() {
-        return transport.isConnected();
+        return socket != null && socket.isConnected() && !socket.isClosed();
     }
 
-    /** === Закрытие === */
     @Override
     public void close() {
         manualClose = true;
-        transport.close();
+        try {
+            if (socket != null) socket.close();
+        } catch (IOException ignore) {}
         scheduler.shutdownNow();
     }
 }

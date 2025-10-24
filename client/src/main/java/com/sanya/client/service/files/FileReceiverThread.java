@@ -1,6 +1,6 @@
 package com.sanya.client.service.files;
 
-import com.sanya.events.core.EventBus;
+import com.sanya.events.core.DefaultEventBus;
 import com.sanya.events.file.FileIncomingEvent;
 import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferEvent;
@@ -18,14 +18,14 @@ public class FileReceiverThread extends Thread {
 
     private final ObjectInputStream in;
     private final File saveFile;
-    private final EventBus eventBus;
+    private final DefaultEventBus defaultEventBus;
     private final FileTransferRequest request;
 
-    public FileReceiverThread(FileIncomingEvent event, File saveFile, EventBus eventBus) {
+    public FileReceiverThread(FileIncomingEvent event, File saveFile, DefaultEventBus defaultEventBus) {
         super("FileReceiver-" + saveFile.getName());
         this.in = event.input();
         this.saveFile = saveFile;
-        this.eventBus = eventBus;
+        this.defaultEventBus = defaultEventBus;
         this.request = event.request();
     }
 
@@ -34,7 +34,7 @@ public class FileReceiverThread extends Thread {
         long total = request.getSize();
         long received = 0;
 
-        eventBus.publish(new FileTransferEvent(
+        defaultEventBus.publish(new FileTransferEvent(
                 FileTransferEvent.Type.STARTED,
                 saveFile.getName(), 0, total, false, "Receiving from " + request.getSender()
         ));
@@ -47,7 +47,7 @@ public class FileReceiverThread extends Thread {
                 fos.write(chunk.getData());
                 received += chunk.getData().length;
 
-                eventBus.publish(new FileTransferEvent(
+                defaultEventBus.publish(new FileTransferEvent(
                         FileTransferEvent.Type.PROGRESS,
                         saveFile.getName(), received, total, false, null
                 ));
@@ -55,13 +55,13 @@ public class FileReceiverThread extends Thread {
                 if (chunk.isLast()) break;
             }
 
-            eventBus.publish(new FileTransferEvent(
+            defaultEventBus.publish(new FileTransferEvent(
                     FileTransferEvent.Type.COMPLETED,
                     saveFile.getName(), total, total, false, null
             ));
 
         } catch (Exception e) {
-            eventBus.publish(new FileTransferEvent(
+            defaultEventBus.publish(new FileTransferEvent(
                     FileTransferEvent.Type.FAILED,
                     saveFile.getName(), 0, total, false, e.getMessage()
             ));

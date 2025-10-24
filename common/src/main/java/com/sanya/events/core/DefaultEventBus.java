@@ -3,7 +3,7 @@ package com.sanya.events.core;
 /**
  * Расширенный EventBus с подпиской, отпиской и поддержкой иерархии событий.
  */
-public interface EventBus {
+public interface DefaultEventBus {
 
     /**
      * Подписывает обработчик на указанный тип события.

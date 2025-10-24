@@ -80,12 +80,13 @@ public class ChatInputPanel extends JPanel {
 
         new Thread(() -> {
             try {
-                FileSender.sendFile(
+                String recipient = ctx.getUserSettings().getName(); // или другой логин получателя
+                ctx.services().fileSender().sendFile(
+                        recipient,
                         chosen,
-                        ctx.getUserSettings().getName(),
-                        ctx.services().chat()::sendObject,
-                        ctx.getEventBus()
+                        ctx.services().chat()::sendObject
                 );
+
             } catch (Exception ex) {
                 ctx.getEventBus().publish(
                         new SystemMessageEvent("[ERROR] Отправка файла: " + ex.getMessage())

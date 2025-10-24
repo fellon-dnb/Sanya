@@ -13,8 +13,8 @@ import com.sanya.client.settings.UserSettings;
 import com.sanya.client.facade.UIFacade;
 import com.sanya.crypto.KeyUtils;
 import com.sanya.crypto.SignedPreKeyBundle;
-import com.sanya.events.core.EventBus;
-import com.sanya.events.core.SimpleEventBus;
+import com.sanya.events.core.DefaultEventBus;
+import com.sanya.events.core.SimpleDefaultEventBus;
 
 import java.security.KeyPair;
 import java.util.Map;
@@ -27,7 +27,7 @@ public final class ApplicationContext {
     private final NetworkSettings networkSettings;
     private final UserSettings userSettings = new UserSettings();
     private final UiSettings uiSettings = new UiSettings();
-    private final EventBus eventBus = new SimpleEventBus();
+    private final DefaultEventBus defaultEventBus = new SimpleDefaultEventBus();
     private final CommandHandler commandHandler = new CommandHandler(this);
     private final AppCore core = new AppCore(this);
     private UIFacade uiFacade;
@@ -44,7 +44,7 @@ public final class ApplicationContext {
         } catch (Exception e) {
             throw new RuntimeException("Failed to init crypto keys", e);
         }
-        di.registerSingleton(EventBus.class, () -> eventBus);
+        di.registerSingleton(DefaultEventBus.class, () -> defaultEventBus);
         di.registerSingleton(ApplicationContext.class, () -> this);
         di.registerSingleton(ChatService.class, () -> core.services().chat());
         di.registerSingleton(VoiceService.class, () -> core.services().voice());
@@ -56,7 +56,7 @@ public final class ApplicationContext {
     }
 
     public DependencyContainer di() { return di; }
-    public EventBus getEventBus() { return eventBus; }
+    public DefaultEventBus getEventBus() { return defaultEventBus; }
     public NetworkSettings getNetworkSettings() { return networkSettings; }
     public UiSettings getUiSettings() { return uiSettings; }
     public UserSettings getUserSettings() { return userSettings; }

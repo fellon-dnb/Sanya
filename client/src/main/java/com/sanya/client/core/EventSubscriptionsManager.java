@@ -102,8 +102,8 @@ public class EventSubscriptionsManager {
     private void registerVoiceSubscriptions() {
         // Голосовые сообщения от других пользователей
         subscribe(VoiceMessageReadyEvent.class, e -> {
-            if (!e.username().equals(context.getUserSettings().getName())) {
-                SwingUtilities.invokeLater(() -> ui.showVoiceMessage(e.username(), e.data()));
+            if (!e.recipient().equals(context.getUserSettings().getName())) {
+                SwingUtilities.invokeLater(() -> ui.showVoiceMessage(e.recipient(), e.data()));
             }
         });
 
