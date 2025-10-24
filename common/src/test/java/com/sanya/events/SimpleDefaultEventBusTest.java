@@ -4,19 +4,19 @@ import com.sanya.Message;
 import com.sanya.events.chat.MessageEvent;
 import com.sanya.events.chat.MessageReceivedEvent;
 import com.sanya.events.chat.MessageSendEvent;
-import com.sanya.events.core.EventBus;
-import com.sanya.events.core.SimpleEventBus;
+import com.sanya.events.core.DefaultEventBus;
+import com.sanya.events.core.SimpleDefaultEventBus;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class SimpleEventBusTest {
+public class SimpleDefaultEventBusTest {
 
     @Test
     void testHierarchyEventDelivery() {
-        EventBus bus = new SimpleEventBus();
+        DefaultEventBus bus = new SimpleDefaultEventBus();
 
         AtomicInteger counter = new AtomicInteger(0);
 

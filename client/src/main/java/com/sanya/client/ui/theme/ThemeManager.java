@@ -1,7 +1,7 @@
 package com.sanya.client.ui.theme;
 
 import com.sanya.client.ApplicationContext;
-import com.sanya.events.core.EventBus;
+import com.sanya.client.core.api.EventBus;
 import com.sanya.events.system.Theme;
 import com.sanya.events.system.ThemeChangedEvent;
 

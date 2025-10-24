@@ -1,23 +1,34 @@
 package com.sanya.client.service.files;
 
-import com.sanya.events.core.EventBus;
+import com.sanya.client.core.api.EventBus;
+import com.sanya.client.core.api.FileTransferService;
+import com.sanya.events.core.DefaultEventBus;
 import com.sanya.files.FileChunk;
 import com.sanya.files.FileTransferEvent;
 import com.sanya.files.FileTransferRequest;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class FileSender {
+public class FileSender implements FileTransferService {
 
     private static final Logger log = Logger.getLogger(FileSender.class.getName());
+    private final EventBus eventBus;
+    private final Map<String, FileReceiverState> receivers = new HashMap<>();
+    private final Map<String, FileOutputStream> openFiles = new HashMap<>();
 
-    public static void sendFile(File file, String username,
-                                Consumer<Object> sender, EventBus eventBus) throws Exception {
+    public FileSender(EventBus eventBus) {
+        this.eventBus = eventBus;
+    }
 
+    @Override
+    public void sendFile(String username, File file, Consumer<Object> sender)  {
         long totalBytes = file.length();
         long sentBytes = 0;
         int bufferSize = 8192;
@@ -36,9 +47,7 @@ public class FileSender {
                 sender.accept(chunk);
                 sentBytes += read;
 
-                int percent = (int) ((100.0 * sentBytes) / totalBytes);
                 eventBus.publish(new FileTransferEvent(FileTransferEvent.Type.PROGRESS, file.getName(), sentBytes, totalBytes, true, null));
-                log.fine("Progress " + percent + "% (" + sentBytes + "/" + totalBytes + ")");
             }
 
             eventBus.publish(new FileTransferEvent(FileTransferEvent.Type.COMPLETED, file.getName(), totalBytes, totalBytes, true, null));
@@ -46,7 +55,44 @@ public class FileSender {
         } catch (Exception e) {
             eventBus.publish(new FileTransferEvent(FileTransferEvent.Type.FAILED, file.getName(), sentBytes, totalBytes, true, e.getMessage()));
             log.log(Level.SEVERE, "File transfer failed: " + file.getName(), e);
-            throw e;
+
+        }
+    }
+
+    @Override
+    public void receiveFile(FileChunk chunk) {
+        try {
+            FileOutputStream out = openFiles.computeIfAbsent(
+                    chunk.getFilename(),
+                    name -> {
+                        try {
+                            return new FileOutputStream("recv_" + name, true);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+            );
+
+            out.write(chunk.getData());
+            out.flush();
+
+            if (chunk.isLast()) {
+                out.close();
+                openFiles.remove(chunk.getFilename());
+                eventBus.publish(new FileTransferEvent(FileTransferEvent.Type.COMPLETED, chunk.getFilename(), -1, -1, false, null));
+            }
+        } catch (Exception e) {
+            eventBus.publish(new FileTransferEvent(FileTransferEvent.Type.FAILED, chunk.getFilename(), -1, -1, false, e.getMessage()));
+            log.log(Level.WARNING, "File receive failed: " + chunk.getFilename(), e);
+        }
+    }
+
+    private static class FileReceiverState {
+        final FileOutputStream out;
+
+        FileReceiverState(String fileName) throws Exception {
+            File target = new File("recv_" + fileName);
+            this.out = new FileOutputStream(target, true);
         }
     }
 }

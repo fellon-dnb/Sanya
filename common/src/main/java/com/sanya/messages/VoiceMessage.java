@@ -1,4 +1,5 @@
 package com.sanya.messages;
 
-public record VoiceMessage() {
-}
+import java.io.Serializable;
+
+public record VoiceMessage(String recipient, byte[] data) implements Serializable {}

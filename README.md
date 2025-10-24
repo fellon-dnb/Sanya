@@ -16,7 +16,7 @@
 
 ## Архитектура
 
-- **EventBus (SimpleEventBus)** — обмен событиями между слоями  
+- **EventBus** **(SimpleEventBus)** — обмен событиями между слоями  
 - **ChatServer** — пересылает сообщения, файлы и голосовые пакеты между клиентами  
 - **ChatClientConnector** — TCP-соединение клиента с сервером  
 - **VoiceService / VoiceRecorder / VoicePlayer** — управление записью и воспроизведением  

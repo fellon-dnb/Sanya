@@ -93,11 +93,10 @@ public class ChatClientController {
 
         new Thread(() -> {
             try {
-                FileSender.sendFile(
-                        file,
+                context.services().fileSender().sendFile(
                         context.getUserSettings().getName(),
-                        context.services().chat()::sendObject,
-                        context.getEventBus()
+                        file,
+                        context.services().chat()::sendObject
                 );
             } catch (Exception ex) {
                 context.getEventBus().publish(

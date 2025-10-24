@@ -38,3 +38,98 @@
 [2025-10-19 20:03:44] [INFO] com.sanya.client.net.ChatTransport - Connected to localhost:12345 
 [2025-10-19 20:03:44] [INFO] com.sanya.client.net.ChatConnector - Sent SignedPreKeyBundle for qwe 
 [2025-10-19 20:03:56] [INFO] com.sanya.client.net.ChatConnector - Stored verified bundle from xcxxv 
+[2025-10-24 15:11:17] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 15:11:17] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 15:11:20] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: r (localhost:12345) 
+[2025-10-24 15:11:20] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 15:11:20] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 15:11:20] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 15:11:20] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 15:11:20] [WARNING] com.sanya.client.net.ChatConnector - Send failed: Connection refused: connect 
+[2025-10-24 15:11:20] [INFO] com.sanya.client.net.ChatConnector - Disconnected: Connection refused: connect 
+[2025-10-24 15:11:20] [CONFIG] com.sanya.client.net.ChatConnector - Reconnect attempt 1 after 2s 
+[2025-10-24 15:11:22] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 15:11:22] [WARNING] com.sanya.client.net.ChatConnector - Send failed: Connection refused: connect 
+[2025-10-24 15:11:22] [INFO] com.sanya.client.net.ChatConnector - Reconnection succeeded 
+[2025-10-24 15:11:27] [WARNING] com.sanya.client.net.ChatConnector - Encryption failed 
+[2025-10-24 16:03:24] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 16:03:24] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 16:03:28] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: try (localhost:12345) 
+[2025-10-24 16:03:28] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 16:03:28] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 16:03:28] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 16:03:28] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 16:03:28] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for try 
+[2025-10-24 16:03:28] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 16:04:28] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:21:39] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:21:39] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:21:42] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: et (localhost:12345) 
+[2025-10-24 17:21:42] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:21:42] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:21:42] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:21:42] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:21:42] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for et 
+[2025-10-24 17:21:43] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:21:57] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:24:11] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:24:11] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:24:14] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 2 (localhost:12345) 
+[2025-10-24 17:24:14] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:24:14] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:24:14] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:24:14] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:24:14] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for 2 
+[2025-10-24 17:24:14] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:24:21] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:28:35] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:28:35] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:28:36] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: ttt (localhost:12345) 
+[2025-10-24 17:28:36] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:28:36] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:28:36] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:28:36] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:28:36] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for ttt 
+[2025-10-24 17:28:37] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:28:43] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:28:51] [WARNING] com.sanya.client.net.ChatConnector - Error processing message 
+[2025-10-24 17:30:47] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:30:47] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:30:49] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 33 (localhost:12345) 
+[2025-10-24 17:30:49] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:30:49] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:30:49] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:30:49] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:30:49] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for 33 
+[2025-10-24 17:30:49] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:30:55] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:31:02] [WARNING] com.sanya.client.net.ChatConnector - Error processing message 
+[2025-10-24 17:34:56] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:34:56] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:34:58] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 2 (localhost:12345) 
+[2025-10-24 17:34:58] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:34:58] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:34:58] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:34:58] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:34:58] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for 2 
+[2025-10-24 17:34:58] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:35:04] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:35:13] [WARNING] com.sanya.client.net.ChatConnector - Error processing message 
+[2025-10-24 17:47:25] [INFO] com.sanya.client.net.ChatConnector - Disconnected: Connection reset 
+[2025-10-24 17:47:25] [CONFIG] com.sanya.client.net.ChatConnector - Reconnect attempt 1 after 2s 
+[2025-10-24 17:47:27] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:47:27] [WARNING] com.sanya.client.net.ChatConnector - Send failed: Connection refused: connect 
+[2025-10-24 17:47:27] [INFO] com.sanya.client.net.ChatConnector - Reconnection succeeded 
+[2025-10-24 17:47:27] [INFO] com.sanya.client.Application - Shutdown hook executed 
+[2025-10-24 17:52:51] [INFO] com.sanya.client.Application - Logging configuration loaded successfully 
+[2025-10-24 17:52:51] [INFO] com.sanya.client.core.CommandHandler - CommandHandler initialized 
+[2025-10-24 17:52:53] [CONFIG] com.sanya.client.net.ChatConnector - Initializing ChatConnector for user: 333 (localhost:12345) 
+[2025-10-24 17:52:53] [INFO] com.sanya.client.service.ChatService - ChatService transport attached 
+[2025-10-24 17:52:53] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registering voice subscriptions, total so far: 0 
+[2025-10-24 17:52:53] [INFO] com.sanya.client.core.EventSubscriptionsManager - Registered 13 event subscriptions 
+[2025-10-24 17:52:53] [CONFIG] com.sanya.client.net.ChatConnector - Connecting to server... 
+[2025-10-24 17:52:53] [INFO] com.sanya.client.net.ChatConnector - Sent X25519 KeyHello for 333 
+[2025-10-24 17:52:53] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 1 
+[2025-10-24 17:53:01] [INFO] com.sanya.client.net.ChatConnector - Updated key directory: 2 
+[2025-10-24 17:53:11] [WARNING] com.sanya.client.net.ChatConnector - Error processing message 
+[2025-10-24 17:53:38] [INFO] com.sanya.client.Application - Shutdown hook executed 
