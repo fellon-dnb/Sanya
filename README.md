@@ -16,8 +16,8 @@ sanya/
  Основные принципы:
 
 Event-Driven: всё взаимодействие построено через собственный SimpleEventBus.
-Сервисы как модули: ChatService, VoiceService, ThemeManager, FileTransfer.
-DependencyContainer: минималистичный DI без внешних библиотек.
+Сервисы - модули: ChatService, VoiceService, ThemeManager, FileTransfer.
+DependencyContainer: мини DI без внешних библиотек.
 Отделение логики и UI: фасад UIFacade изолирует Swing от ядра.
 
 Возможности:
