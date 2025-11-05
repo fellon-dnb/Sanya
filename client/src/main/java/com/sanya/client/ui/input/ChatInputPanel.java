@@ -67,11 +67,13 @@ public final class ChatInputPanel extends JPanel {
         add(input, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
 
+        input.addActionListener(e -> sendMessage());
         send.addActionListener(e -> sendMessage());
         file.addActionListener(e -> doSendFile());
 
         setupVoiceButton();
     }
+
 
     /**
      * Настраивает кнопку микрофона, обеспечивая удаление старых слушателей

@@ -3,10 +3,9 @@ package com.sanya.client.core;
 import com.ancevt.replines.core.argument.Arguments;
 import com.ancevt.replines.core.repl.ReplRunner;
 import com.ancevt.replines.core.repl.annotation.ReplCommand;
+import com.ancevt.replines.core.repl.io.BufferedLineOutputStream;
 import com.sanya.client.ApplicationContext;
 
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,7 +36,9 @@ public class CommandHandler {
      */
     public CommandHandler(ApplicationContext ctx) {
         replRunner = ReplRunner.builder()
-                .withOutput(new PrintStream(System.out, true, StandardCharsets.UTF_8))
+                .withOutput(new BufferedLineOutputStream(text -> {
+                    ctx.getUIFacade().appendSystemMessage(text);
+                }))
                 .withCommandFilterPrefix("/") // все команды начинаются с "/"
                 .configure(reg -> reg.register(new CommandDefinitions(ctx)))
                 .build();
