@@ -1,16 +1,23 @@
 package com.sanya.client.core;
 
+import com.ancevt.replines.core.repl.UnknownCommandException;
 import com.sanya.client.ApplicationContext;
-import com.sanya.client.net.ChatConnector;
 import com.sanya.client.facade.UIFacade;
+import com.sanya.client.net.ChatConnector;
 import com.sanya.client.ui.dialog.ChatVoiceDialog;
-import com.sanya.events.chat.*;
+import com.sanya.events.chat.MessageReceivedEvent;
+import com.sanya.events.chat.MessageSendEvent;
+import com.sanya.events.chat.UserDisconnectedEvent;
+import com.sanya.events.chat.UserListUpdatedEvent;
 import com.sanya.events.core.EventHandler;
 import com.sanya.events.file.FileIncomingEvent;
 import com.sanya.events.system.SystemMessageEvent;
 import com.sanya.events.system.ThemeChangedEvent;
 import com.sanya.events.ui.ClearChatEvent;
-import com.sanya.events.voice.*;
+import com.sanya.events.voice.VoiceLevelEvent;
+import com.sanya.events.voice.VoiceMessageReadyEvent;
+import com.sanya.events.voice.VoiceRecordingEvent;
+import com.sanya.events.voice.VoiceRecordingStoppedEvent;
 import com.sanya.files.FileTransferEvent;
 
 import javax.swing.*;
@@ -88,8 +95,20 @@ public class EventSubscriptionsManager {
 
     /** === Подписки на сообщения === */
     private void registerMessageSubscriptions() {
+
         // Отправка сообщений (UI -> сеть)
         subscribe(MessageSendEvent.class, e -> {
+
+            if (e.text().startsWith("/")) {
+                try {
+                    context.getCommandHandler().getReplRunner().execute(e.text());
+                    return;
+                } catch (UnknownCommandException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
+
             if (connector != null) {
                 connector.sendMessage(e.text());
             }
